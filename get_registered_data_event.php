@@ -12,15 +12,20 @@ if ($conn->connect_error) {
     die(json_encode(['success' => false, 'message' => 'Main DB connection failed']));
 }
 
-// Step 2: Get event ID from request
+// Step 2: Get input data (event_id, page, page_size)
 $rawInput = file_get_contents("php://input");
 $input = json_decode($rawInput, true);
+
 $event_id = isset($input['event_id']) ? intval($input['event_id']) : 0;
+$page = isset($input['page']) ? max(1, intval($input['page'])) : 1;           // default to 1
+$page_size = isset($input['page_size']) ? max(1, intval($input['page_size'])) : 20; // default to 20
 
 if (!$event_id) {
     echo json_encode(['success' => false, 'message' => 'Event ID is required']);
     exit();
 }
+
+$offset = ($page - 1) * $page_size;
 
 // Step 3: Get event short_name from main DB
 $eventQuery = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
@@ -44,7 +49,36 @@ if ($eventConn->connect_error) {
     exit();
 }
 
-// Step 5: Full Query with attendees_1 from main DB, event_registrations & event_categories from event DB
+// Step 5a: Get total count for pagination
+$countQuery = "
+    SELECT COUNT(*) as total_count
+    FROM {$eventDb}.event_registrations er
+    WHERE er.is_deleted = 0 AND er.event_id = ?
+";
+
+$countStmt = $eventConn->prepare($countQuery);
+$countStmt->bind_param("i", $event_id);
+$countStmt->execute();
+$countResult = $countStmt->get_result();
+$totalCount = 0;
+if ($countRow = $countResult->fetch_assoc()) {
+    $totalCount = intval($countRow['total_count']);
+}
+$countStmt->close();
+
+if ($totalCount === 0) {
+    // No registrations, return empty response early
+    echo json_encode([
+        'success' => true,
+        'total_count' => 0,
+        'data' => []
+    ]);
+    $conn->close();
+    $eventConn->close();
+    exit();
+}
+
+// Step 5b: Fetch registrations for requested page only
 $query = "
     SELECT 
         er.*, 
@@ -57,23 +91,29 @@ $query = "
     FROM {$eventDb}.event_registrations er
     LEFT JOIN {$mainDb}.attendees_1 a ON er.user_id = a.id
     LEFT JOIN {$eventDb}.event_categories c ON er.category_id = c.id
-    WHERE er.is_deleted = 0 AND er.event_id = $event_id
+    WHERE er.is_deleted = 0 AND er.event_id = ?
+    LIMIT ? OFFSET ?
 ";
 
-$result = $eventConn->query($query);
-if (!$result) {
-    echo json_encode(['success' => false, 'message' => 'Query failed', 'error' => $eventConn->error]);
-    exit();
-}
+$stmt = $eventConn->prepare($query);
+$stmt->bind_param("iii", $event_id, $page_size, $offset);
+$stmt->execute();
+$result = $stmt->get_result();
 
 $registrations = [];
 while ($row = $result->fetch_assoc()) {
     $registrations[] = $row;
 }
 
-// Output
-echo json_encode(['success' => true, 'data' => $registrations]);
-
+$stmt->close();
 $conn->close();
 $eventConn->close();
-?>
+
+// Output JSON response
+echo json_encode([
+    'success' => true,
+    'total_count' => $totalCount,
+    'page' => $page,
+    'page_size' => $page_size,
+    'data' => $registrations,
+]);
