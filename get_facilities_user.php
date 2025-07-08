@@ -21,8 +21,8 @@ $user_id = intval($input['user_id']);
 
 $sql = "
     SELECT f.id, f.name, f.count, f.created_at, f.modified_at, f.is_deleted
-    FROM functionalities f
-    INNER JOIN user_access ua ON ua.functionality_id = f.id
+    FROM reg_functionalities f
+    INNER JOIN reg_user_access ua ON ua.functionality_id = f.id
     WHERE ua.user_id = ? AND ua.is_deleted = 0 AND f.is_deleted = 0
 ";
 
