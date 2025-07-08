@@ -12,13 +12,13 @@ if ($conn->connect_error) {
     die(json_encode(['success' => false, 'message' => 'Main DB connection failed']));
 }
 
-// Step 2: Get input data (event_id, page, page_size)
+// Step 2: Get input data
 $rawInput = file_get_contents("php://input");
 $input = json_decode($rawInput, true);
 
 $event_id = isset($input['event_id']) ? intval($input['event_id']) : 0;
-$page = isset($input['page']) ? max(1, intval($input['page'])) : 1;           // default to 1
-$page_size = isset($input['page_size']) ? max(1, intval($input['page_size'])) : 20; // default to 20
+$page = isset($input['page']) ? max(1, intval($input['page'])) : 1;
+$page_size = isset($input['page_size']) ? intval($input['page_size']) : 20;
 
 if (!$event_id) {
     echo json_encode(['success' => false, 'message' => 'Event ID is required']);
@@ -27,7 +27,7 @@ if (!$event_id) {
 
 $offset = ($page - 1) * $page_size;
 
-// Step 3: Get event short_name from main DB
+// Step 3: Get event short_name
 $eventQuery = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
 $eventQuery->bind_param("i", $event_id);
 $eventQuery->execute();
@@ -49,7 +49,7 @@ if ($eventConn->connect_error) {
     exit();
 }
 
-// Step 5a: Get total count for pagination
+// Step 5a: Get total registration count
 $countQuery = "
     SELECT COUNT(*) as total_count
     FROM {$eventDb}.event_registrations er
@@ -60,6 +60,7 @@ $countStmt = $eventConn->prepare($countQuery);
 $countStmt->bind_param("i", $event_id);
 $countStmt->execute();
 $countResult = $countStmt->get_result();
+
 $totalCount = 0;
 if ($countRow = $countResult->fetch_assoc()) {
     $totalCount = intval($countRow['total_count']);
@@ -67,7 +68,6 @@ if ($countRow = $countResult->fetch_assoc()) {
 $countStmt->close();
 
 if ($totalCount === 0) {
-    // No registrations, return empty response early
     echo json_encode([
         'success' => true,
         'total_count' => 0,
@@ -78,7 +78,9 @@ if ($totalCount === 0) {
     exit();
 }
 
-// Step 5b: Fetch registrations for requested page only
+// Step 5b: Fetch registrations
+$limitClause = ($page_size === 0) ? "" : "LIMIT ? OFFSET ?";
+
 $query = "
     SELECT 
         er.*, 
@@ -92,11 +94,19 @@ $query = "
     LEFT JOIN {$mainDb}.attendees_1 a ON er.user_id = a.id
     LEFT JOIN {$eventDb}.event_categories c ON er.category_id = c.id
     WHERE er.is_deleted = 0 AND er.event_id = ?
-    LIMIT ? OFFSET ?
+    $limitClause
 ";
 
-$stmt = $eventConn->prepare($query);
-$stmt->bind_param("iii", $event_id, $page_size, $offset);
+if ($page_size === 0) {
+    // No pagination
+    $stmt = $eventConn->prepare($query);
+    $stmt->bind_param("i", $event_id);
+} else {
+    // With pagination
+    $stmt = $eventConn->prepare($query);
+    $stmt->bind_param("iii", $event_id, $page_size, $offset);
+}
+
 $stmt->execute();
 $result = $stmt->get_result();
 
@@ -105,15 +115,16 @@ while ($row = $result->fetch_assoc()) {
     $registrations[] = $row;
 }
 
+// Clean up
 $stmt->close();
 $conn->close();
 $eventConn->close();
 
-// Output JSON response
+// Output
 echo json_encode([
     'success' => true,
     'total_count' => $totalCount,
     'page' => $page,
     'page_size' => $page_size,
-    'data' => $registrations,
+    'data' => $registrations
 ]);

@@ -14,7 +14,7 @@ if ($conn->connect_error) {
     die(json_encode(['success' => false, 'message' => 'Database connection failed']));
 }
 
-// Start session (if needed)
+// Start session
 session_start();
 
 // Get input data
@@ -31,8 +31,8 @@ if (!$user_id) {
     exit();
 }
 
-// Check if user exists and get is_admin status
-$stmt = $conn->prepare("SELECT is_admin FROM users WHERE id = ? AND is_deleted = 0");
+// Fetch user details: is_admin and event_id
+$stmt = $conn->prepare("SELECT is_admin, event_id FROM users WHERE id = ? AND is_deleted = 0");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $result = $stmt->get_result();
@@ -44,22 +44,24 @@ if ($result->num_rows === 0) {
 
 $user = $result->fetch_assoc();
 $is_admin = intval($user['is_admin']);
+$user_event_id = intval($user['event_id']); // Assuming it's a single ID
 
-// Build query based on admin status
-if ($is_admin === 0) {
-    // Non-admin: show only events active today
+// Build query
+if ($is_admin === 1) {
+    // Admin: get all active (not deleted) events
     $sql = "SELECT * FROM events 
             WHERE is_deleted = 0 
-            AND CURDATE() BETWEEN from_date AND to_date 
             ORDER BY from_date DESC";
 } else {
-    // Admin: show all active events
+    // Non-admin: get their assigned event regardless of date
     $sql = "SELECT * FROM events 
             WHERE is_deleted = 0 
+            AND id = $user_event_id
             ORDER BY from_date DESC";
 }
 
-// Fetch events
+
+// Execute query
 $eventResult = $conn->query($sql);
 $events = [];
 
