@@ -31,7 +31,19 @@ try {
     $eventDb = new PDO("mysql:host=localhost;dbname={$eventDbName};charset=utf8mb4", 'root', '');
     $eventDb->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Step 3: Check if user exists in attendees_1 (main DB)
+    // Step 3: Fetch event category settings from event-specific DB
+    $categoryStmt = $eventDb->prepare("SELECT * FROM event_categories WHERE id = :category_id AND event_id = :event_id LIMIT 1");
+    $categoryStmt->execute([
+        ':category_id' => $categoryId,
+        ':event_id' => $eventId,
+    ]);
+    $category = $categoryStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$category) {
+        throw new Exception('Category not found for this event');
+    }
+
+    // Step 4: Check if user exists in attendees_1 (main DB)
     $stmtUser = $attendeeDb->prepare("
         SELECT id, is_deleted FROM attendees_1 
         WHERE (first_name = :first_name AND last_name = :last_name)
@@ -47,8 +59,7 @@ try {
     ]);
     $attendee = $stmtUser->fetch(PDO::FETCH_ASSOC);
 
-    // Step 4: Check if user is already registered for the event by matching name or email in event registrations
-    // Join event_registrations with attendees_1 on user_id and check matching first_name, last_name, or email
+    // Step 5: Check for existing registration
     $stmtExistingReg = $eventDb->prepare("
         SELECT er.id, er.is_deleted, a.id AS attendee_id
         FROM event_registrations er
@@ -73,24 +84,24 @@ try {
     $existingReg = $stmtExistingReg->fetch(PDO::FETCH_ASSOC);
 
     if ($existingReg) {
-        // If registration exists
         if ($existingReg['is_deleted'] == 1) {
-            // Reactivate registration if deleted
             $updateReg = $eventDb->prepare("UPDATE event_registrations SET is_deleted = 0, modified_at = NOW() WHERE id = :id");
             $updateReg->execute([':id' => $existingReg['id']]);
             echo json_encode(['success' => true, 'message' => 'User registration reactivated successfully']);
             exit;
         } else {
-            // Active registration exists
             echo json_encode(['success' => false, 'message' => 'User already registered for this event']);
             exit;
         }
     }
 
-    // Step 5: Insert user into attendees_1 if not exists
+    // Step 6: Insert user into attendees_1 if not exists
     if (!$attendee) {
+        $uniqueId = uniqid('att_', true);  // Generate unique_id for user
+
         $insertUser = $attendeeDb->prepare("
             INSERT INTO attendees_1 (
+                unique_id,
                 prefix, first_name, last_name, short_name, primary_email_address, primary_email_address_verified,
                 secondary_email, country_code, primary_phone_number, primary_phone_number_verified,
                 secondary_mobile_number, city, state, country, pincode, profession, workplace_name,
@@ -98,6 +109,7 @@ try {
                 added_by, area_of_interest, is_verified, profile_photo, birth_date, bio, is_deleted,
                 created_at, modified_at
             ) VALUES (
+                :unique_id,
                 :prefix, :first_name, :last_name, :short_name, :primary_email_address, :primary_email_address_verified,
                 :secondary_email, :country_code, :primary_phone_number, :primary_phone_number_verified,
                 :secondary_mobile_number, :city, :state, :country, :pincode, :profession, :workplace_name,
@@ -110,6 +122,7 @@ try {
         $fullName = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
 
         $insertUser->execute([
+            ':unique_id' => $uniqueId,
             ':prefix' => $user['prefix'] ?? null,
             ':first_name' => $user['first_name'] ?? null,
             ':last_name' => $user['last_name'] ?? null,
@@ -143,14 +156,13 @@ try {
     } else {
         $userId = $attendee['id'];
 
-        // Reactivate attendee if deleted
         if ($attendee['is_deleted'] == 1) {
             $updateAttendee = $attendeeDb->prepare("UPDATE attendees_1 SET is_deleted = 0, modified_at = NOW() WHERE id = :id");
             $updateAttendee->execute([':id' => $userId]);
         }
     }
 
-    // Step 6: Insert registration record into event_registrations table
+    // Step 7: Insert registration
     $insertReg = $eventDb->prepare("
         INSERT INTO event_registrations (
             event_id, user_id, category_id, all_day_registration, travel, accommodation, taxi, kit,
@@ -163,25 +175,27 @@ try {
         )
     ");
 
+    $amount = $category['free_registration'] ? 0 : ($regDetails['amount'] ?? 0);
+
     $insertReg->execute([
         ':event_id' => $eventId,
         ':user_id' => $userId,
         ':category_id' => $categoryId,
-        ':all_day_registration' => $regDetails['all_day_registration'] ?? 0,
-        ':travel' => $regDetails['travel'] ?? 0,
-        ':accommodation' => $regDetails['accommodation'] ?? 0,
-        ':taxi' => $regDetails['taxi'] ?? 0,
-        ':kit' => $regDetails['kit'] ?? 0,
-        ':certificate' => $regDetails['certificate'] ?? 0,
-        ':lunch' => $regDetails['lunch'] ?? 0,
-        ':dinner' => $regDetails['dinner'] ?? 0,
-        ':amount' => $regDetails['amount'] ?? 0,
+        ':all_day_registration' => 1,
+        ':travel' => $category['is_travel'] ?? 0,
+        ':accommodation' => $category['is_accomodation'] ?? 0,
+        ':taxi' => $category['is_travel'] ?? 0,
+        ':kit' => $category['is_kit'] ?? 0,
+        ':certificate' => $category['is_certificate'] ?? 0,
+        ':lunch' => $category['is_lunch'] ?? 0,
+        ':dinner' => $category['is_dinner'] ?? 0,
+        ':amount' => $amount,
         ':transaction_id' => $regDetails['transaction_id'] ?? null,
         ':order_no' => $regDetails['order_no'] ?? null,
         ':order_id' => $regDetails['order_id'] ?? null,
         ':payment_id' => $regDetails['payment_id'] ?? null,
-        ':payment_mode' => $regDetails['payment_mode'] ?? null,
-        ':status' => $regDetails['status'] ?? 0,
+        ':payment_mode' => $regDetails['payment_mode'] ?? 'Free',
+        ':status' => $regDetails['status'] ?? 1,
         ':added_by' => $regDetails['added_by'] ?? null,
     ]);
 

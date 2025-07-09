@@ -5,14 +5,14 @@ header('Access-Control-Allow-Origin: *');
 $mainDb = ['host' => 'localhost', 'db' => 'prop_propass', 'user' => 'root', 'pass' => ''];
 
 $input = json_decode(file_get_contents('php://input'), true);
-$name  = trim($input['name'] ?? '');
 $email = trim($input['email'] ?? '');
 $phone = trim($input['phone'] ?? '');
 
-if (!$name && !$email && !$phone) {
-    echo json_encode(['success' => false, 'message' => 'Provide name, email, or phone']);
+if (!$email && !$phone) {
+    echo json_encode(['success' => false, 'message' => 'Provide email or phone']);
     exit;
 }
+
 
 try {
     $pdoMain = new PDO("mysql:host={$mainDb['host']};dbname={$mainDb['db']};charset=utf8mb4",
@@ -29,12 +29,6 @@ function esc($str) {
     return str_replace(['%', '_'], ['\%', '\_'], $str);
 }
 
-if ($name) {
-    // Match full short_name field (partial or exact)
-    // Use LIKE '%full_name%'
-    $where[] = "short_name LIKE :short_name";
-    $params[':short_name'] = '%' . esc($name) . '%';
-}
 
 if ($email) {
     $where[] = "(primary_email_address LIKE :email OR secondary_email LIKE :email)";
