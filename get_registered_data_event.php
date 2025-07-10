@@ -6,13 +6,11 @@ $servername = "localhost";
 $username = "root";
 $password = "";
 
-// Step 1: Connect to main DB
 $conn = new mysqli($servername, $username, $password, $mainDb);
 if ($conn->connect_error) {
     die(json_encode(['success' => false, 'message' => 'Main DB connection failed']));
 }
 
-// Step 2: Get input data
 $rawInput = file_get_contents("php://input");
 $input = json_decode($rawInput, true);
 
@@ -27,7 +25,6 @@ if (!$event_id) {
 
 $offset = ($page - 1) * $page_size;
 
-// Step 3: Get event short_name
 $eventQuery = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
 $eventQuery->bind_param("i", $event_id);
 $eventQuery->execute();
@@ -42,14 +39,12 @@ $event = $eventResult->fetch_assoc();
 $shortName = $event['short_name'];
 $eventDb = $mainDb . "_event_" . $shortName;
 
-// Step 4: Connect to event-specific DB
 $eventConn = new mysqli($servername, $username, $password, $eventDb);
 if ($eventConn->connect_error) {
     echo json_encode(['success' => false, 'message' => "Failed to connect to event DB: $eventDb"]);
     exit();
 }
 
-// Step 5a: Get total registration count
 $countQuery = "
     SELECT COUNT(*) as total_count
     FROM {$eventDb}.event_registrations er
@@ -78,7 +73,6 @@ if ($totalCount === 0) {
     exit();
 }
 
-// Step 5b: Fetch registrations
 $limitClause = ($page_size === 0) ? "" : "LIMIT ? OFFSET ?";
 
 $query = "
@@ -98,11 +92,9 @@ $query = "
 ";
 
 if ($page_size === 0) {
-    // No pagination
     $stmt = $eventConn->prepare($query);
     $stmt->bind_param("i", $event_id);
 } else {
-    // With pagination
     $stmt = $eventConn->prepare($query);
     $stmt->bind_param("iii", $event_id, $page_size, $offset);
 }
@@ -115,7 +107,6 @@ while ($row = $result->fetch_assoc()) {
     $registrations[] = $row;
 }
 
-// Clean up
 $stmt->close();
 $conn->close();
 $eventConn->close();

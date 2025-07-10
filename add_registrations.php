@@ -2,7 +2,6 @@
 header('Content-Type: application/json');
 
 try {
-    // Connect to main database
     $attendeeDb = new PDO('mysql:host=localhost;dbname=prop_propass;charset=utf8mb4', 'root', '');
     $attendeeDb->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
@@ -17,7 +16,6 @@ try {
     $categoryId = (int)$input['category_id'];
     $regDetails = $input['registration_details'] ?? [];
 
-    // Step 1: Get event short_name for dynamic DB name
     $stmt = $attendeeDb->prepare("SELECT short_name FROM events WHERE id = :event_id LIMIT 1");
     $stmt->execute([':event_id' => $eventId]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -27,11 +25,9 @@ try {
     $eventShortName = $row['short_name'];
     $eventDbName = 'prop_propass_event_' . $eventShortName;
 
-    // Step 2: Connect to event-specific database
     $eventDb = new PDO("mysql:host=localhost;dbname={$eventDbName};charset=utf8mb4", 'root', '');
     $eventDb->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Step 3: Fetch event category settings from event-specific DB
     $categoryStmt = $eventDb->prepare("SELECT * FROM event_categories WHERE id = :category_id AND event_id = :event_id LIMIT 1");
     $categoryStmt->execute([
         ':category_id' => $categoryId,
@@ -43,7 +39,6 @@ try {
         throw new Exception('Category not found for this event');
     }
 
-    // Step 4: Check if user exists in attendees_1 (main DB)
     $stmtUser = $attendeeDb->prepare("
         SELECT id, is_deleted FROM attendees_1 
         WHERE (first_name = :first_name AND last_name = :last_name)
@@ -59,7 +54,6 @@ try {
     ]);
     $attendee = $stmtUser->fetch(PDO::FETCH_ASSOC);
 
-    // Step 5: Check for existing registration
     $stmtExistingReg = $eventDb->prepare("
         SELECT er.id, er.is_deleted, a.id AS attendee_id
         FROM event_registrations er
@@ -95,9 +89,8 @@ try {
         }
     }
 
-    // Step 6: Insert user into attendees_1 if not exists
     if (!$attendee) {
-        $uniqueId = uniqid('att_', true);  // Generate unique_id for user
+        $uniqueId = uniqid('att_', true);  
 
         $insertUser = $attendeeDb->prepare("
             INSERT INTO attendees_1 (
@@ -162,7 +155,7 @@ try {
         }
     }
 
-    // Step 7: Insert registration
+
     $insertReg = $eventDb->prepare("
         INSERT INTO event_registrations (
             event_id, user_id, category_id, all_day_registration, travel, accommodation, taxi, kit,

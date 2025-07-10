@@ -5,6 +5,7 @@ header('Access-Control-Allow-Origin: *');
 $mainDb = ['host' => 'localhost', 'db' => 'prop_propass', 'user' => 'root', 'pass' => ''];
 
 $input = json_decode(file_get_contents('php://input'), true);
+$name = trim($input['name'] ?? '');
 $email = trim($input['email'] ?? '');
 $phone = trim($input['phone'] ?? '');
 
@@ -30,6 +31,11 @@ function esc($str) {
 }
 
 
+if ($name) {
+    $where[] = "(first_name LIKE :last_name OR secondary_email LIKE :name)";
+    $params[':name'] = '%' . esc($email) . '%';
+}
+
 if ($email) {
     $where[] = "(primary_email_address LIKE :email OR secondary_email LIKE :email)";
     $params[':email'] = '%' . esc($email) . '%';
@@ -40,7 +46,6 @@ if ($phone) {
     $params[':phone'] = '%' . esc($phone) . '%';
 }
 
-// Combine all with OR so any match will be found
 $whereSql = count($where) > 0 ? '(' . implode(' OR ', $where) . ") AND is_deleted = 0" : 'is_deleted = 0';
 
 $sql = "SELECT 
