@@ -122,7 +122,7 @@ try {
         $fullName = trim(($user['first_name'] ?? '') . ' ' . ($user['last_name'] ?? ''));
 
         $insertUser->execute([
-            ':unique_id' => $uniqueId,
+            ':unique_id' => UUID_SHORT(),
             ':prefix' => $user['prefix'] ?? null,
             ':first_name' => $user['first_name'] ?? null,
             ':last_name' => $user['last_name'] ?? null,
