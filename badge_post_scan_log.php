@@ -18,19 +18,19 @@ try {
     $event_id    = $_POST['event_id'] ?? null;
     $user_id     = $_POST['user_id'] ?? null;
     $attendee_id = $_POST['attendee_id'] ?? null;
+    $app_user_id = $_POST['app_user_id'] ?? null;
     $date        = $_POST['date'] ?? date('Y-m-d');
     $time        = $_POST['time'] ?? date('H:i:s');
     $status      = $_POST['status'] ?? 1;
     $is_delete   = $_POST['is_delete'] ?? 0;
     $print_type  = $_POST['print_type'] ?? null;
-    
-    // New enum-like param for badge scan type or context, default to 'badge'
-    $scan_for    = $_POST['scan_for'] ?? 'badge'; 
+    $scan_for    = $_POST['scan_for'] ?? 'badge';
 
     if (!$event_id || !$user_id || !$attendee_id) {
         throw new Exception("Missing required fields: event_id, user_id, or attendee_id");
     }
 
+    // Fetch event short_name to determine event-specific DB
     $stmt = $mainPdo->prepare("SELECT short_name FROM events WHERE id = :event_id LIMIT 1");
     $stmt->execute([':event_id' => $event_id]);
     $event = $stmt->fetch();
@@ -44,7 +44,7 @@ try {
     $eventDsn  = "mysql:host=$mainHost;dbname=$eventDb;charset=$charset";
     $eventPdo  = new PDO($eventDsn, $user, $pass, $options);
 
-    // Check if badge scan already exists for this attendee and user (not deleted) for given scan_for context
+    // Check for existing scan (optional: can include app_user_id for more granularity)
     $checkStmt = $eventPdo->prepare("
         SELECT id FROM event_scan_logg 
         WHERE event_id = :event_id
@@ -76,24 +76,26 @@ try {
         $print_type = 'Auto';
     }
 
+    // Insert scan record
     $insert = $eventPdo->prepare("
         INSERT INTO event_scan_logg (
-            event_id, user_id, attendee_id, date, time, print_type, status, is_delete, scan_for, created_at, updated_at
+            event_id, user_id, attendee_id, app_user_id, date, time, print_type, status, is_delete, scan_for, created_at, updated_at
         ) VALUES (
-            :event_id, :user_id, :attendee_id, :date, :time, :print_type, :status, :is_delete, :scan_for, NOW(), NOW()
+            :event_id, :user_id, :attendee_id, :app_user_id, :date, :time, :print_type, :status, :is_delete, :scan_for, NOW(), NOW()
         )
     ");
 
     $insert->execute([
-        ':event_id'    => $event_id,
-        ':user_id'     => $user_id,
-        ':attendee_id' => $attendee_id,
-        ':date'        => $date,
-        ':time'        => $time,
-        ':print_type'  => $print_type,
-        ':status'      => $status,
-        ':is_delete'   => $is_delete,
-        ':scan_for'    => $scan_for,
+        ':event_id'     => $event_id,
+        ':user_id'      => $user_id,
+        ':attendee_id'  => $attendee_id,
+        ':app_user_id'  => $app_user_id,
+        ':date'         => $date,
+        ':time'         => $time,
+        ':print_type'   => $print_type,
+        ':status'       => $status,
+        ':is_delete'    => $is_delete,
+        ':scan_for'     => $scan_for,
     ]);
 
     echo json_encode([
