@@ -1,16 +1,19 @@
 <?php
 header('Content-Type: application/json');
 
+// Database credentials
 $mainDb = "prop_propass";
 $servername = "localhost";
 $username = "root";
 $password = "";
 
+// Connect to main DB
 $conn = new mysqli($servername, $username, $password, $mainDb);
 if ($conn->connect_error) {
     die(json_encode(['success' => false, 'message' => 'Main DB connection failed']));
 }
 
+// Read JSON input
 $rawInput = file_get_contents("php://input");
 $input = json_decode($rawInput, true);
 
@@ -23,8 +26,10 @@ if (!$event_id) {
     exit();
 }
 
+// Calculate offset
 $offset = ($page - 1) * $page_size;
 
+// Get event short_name to form event DB name
 $eventQuery = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
 $eventQuery->bind_param("i", $event_id);
 $eventQuery->execute();
@@ -39,18 +44,19 @@ $event = $eventResult->fetch_assoc();
 $shortName = $event['short_name'];
 $eventDb = $mainDb . "_event_" . $shortName;
 
+// Connect to event-specific DB
 $eventConn = new mysqli($servername, $username, $password, $eventDb);
 if ($eventConn->connect_error) {
     echo json_encode(['success' => false, 'message' => "Failed to connect to event DB: $eventDb"]);
     exit();
 }
 
+// Get total count of registrations
 $countQuery = "
     SELECT COUNT(*) as total_count
     FROM {$eventDb}.event_registrations er
     WHERE er.is_deleted = 0 AND er.event_id = ?
 ";
-
 $countStmt = $eventConn->prepare($countQuery);
 $countStmt->bind_param("i", $event_id);
 $countStmt->execute();
@@ -73,6 +79,7 @@ if ($totalCount === 0) {
     exit();
 }
 
+// Prepare query to fetch registrations joined with attendees and categories
 $limitClause = ($page_size === 0) ? "" : "LIMIT ? OFFSET ?";
 
 $query = "
@@ -91,11 +98,13 @@ $query = "
     $limitClause
 ";
 
+$stmt = $eventConn->prepare($query);
+
 if ($page_size === 0) {
-    $stmt = $eventConn->prepare($query);
+    // Fetch all records, no limit
     $stmt->bind_param("i", $event_id);
 } else {
-    $stmt = $eventConn->prepare($query);
+    // Fetch paginated records
     $stmt->bind_param("iii", $event_id, $page_size, $offset);
 }
 
@@ -111,7 +120,7 @@ $stmt->close();
 $conn->close();
 $eventConn->close();
 
-// Output
+// Output response
 echo json_encode([
     'success' => true,
     'total_count' => $totalCount,
