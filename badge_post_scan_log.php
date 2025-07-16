@@ -1,4 +1,6 @@
 <?php
+// Set timezone to ensure correct current date/time if not provided
+date_default_timezone_set('Asia/Kolkata');  // Change as needed
 
 $mainHost = 'localhost';
 $mainDb   = 'prop_propass';
@@ -19,8 +21,11 @@ try {
     $user_id     = $_POST['user_id'] ?? null;
     $attendee_id = $_POST['attendee_id'] ?? null;
     $app_user_id = $_POST['app_user_id'] ?? null;
-    $date        = $_POST['date'] ?? date('Y-m-d');
-    $time        = $_POST['time'] ?? date('H:i:s');
+
+    // If date/time are not posted, use current server date/time
+    $date = $_POST['date'] ?? date('Y-m-d');
+    $time = $_POST['time'] ?? date('H:i:s');
+
     $status      = $_POST['status'] ?? 1;
     $is_delete   = $_POST['is_delete'] ?? 0;
     $print_type  = $_POST['print_type'] ?? null;

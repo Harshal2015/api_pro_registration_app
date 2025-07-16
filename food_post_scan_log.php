@@ -1,4 +1,6 @@
 <?php
+// Set your timezone here to get correct current date/time
+date_default_timezone_set('Asia/Kolkata');  // Change this to your timezone
 
 $mainHost = 'localhost';
 $mainDb   = 'prop_propass';
@@ -18,13 +20,15 @@ try {
     $event_id    = $_POST['event_id'] ?? null;
     $user_id     = $_POST['user_id'] ?? null;
     $attendee_id = $_POST['attendee_id'] ?? null;
-    $date        = $_POST['date'] ?? date('Y-m-d');
-    $time        = $_POST['time'] ?? date('H:i:s');
+
+    // Get current server date and time as strings for varchar columns
+    $date = date('Y-m-d');
+    $time = date('H:i:s');
+
     $status      = $_POST['status'] ?? 1;
     $is_delete   = $_POST['is_delete'] ?? 0;
     $print_type  = $_POST['print_type'] ?? null;
 
-    // Master QR doesn't require user_id or attendee_id
     if (!$event_id || (!$user_id && $print_type !== 'Master') || (!$attendee_id && $print_type !== 'Master')) {
         throw new Exception("Missing required fields: event_id" .
             (($print_type !== 'Master' && !$user_id) ? ", user_id" : "") .
@@ -32,9 +36,8 @@ try {
         );
     }
 
-    // Determine scan_for based on time
+    // Determine scan_for based on current server time
     $scanTimestamp = strtotime($time);
-
     $lunchStart    = strtotime('11:00:00');
     $lunchEnd      = strtotime('15:59:59');
     $dinnerStart1  = strtotime('16:00:00');
@@ -43,17 +46,17 @@ try {
     $dinnerEnd2    = strtotime('02:59:59');
 
     if ($scanTimestamp >= $lunchStart && $scanTimestamp <= $lunchEnd) {
-        $scan_for = 'lunch';
+        $scan_for = 'Lunch';
     } elseif (
         ($scanTimestamp >= $dinnerStart1 && $scanTimestamp <= $dinnerEnd1) ||
         ($scanTimestamp >= $dinnerStart2 && $scanTimestamp <= $dinnerEnd2)
     ) {
-        $scan_for = 'dinner';
+        $scan_for = 'Dinner';
     } else {
-        $scan_for = 'lunch'; // Default
+        $scan_for = 'Lunch'; // fallback
     }
 
-    // Fetch event DB
+    // Get short_name from main DB
     $stmt = $mainPdo->prepare("SELECT short_name FROM events WHERE id = :event_id LIMIT 1");
     $stmt->execute([':event_id' => $event_id]);
     $event = $stmt->fetch();
@@ -67,8 +70,8 @@ try {
     $eventDsn  = "mysql:host=$mainHost;dbname=$eventDb;charset=$charset";
     $eventPdo  = new PDO($eventDsn, $user, $pass, $options);
 
+    // Prevent duplicate scan unless Manual or Master
     if ($print_type !== 'Master') {
-        // Check for existing scan (not for Master)
         $checkStmt = $eventPdo->prepare("
             SELECT id FROM event_scan_logs_food 
             WHERE event_id = :event_id
@@ -100,12 +103,11 @@ try {
         }
     }
 
-    // Default print_type to Auto
     if (!$print_type) {
         $print_type = 'Auto';
     }
 
-    // Insert scan
+    // Insert with current date/time values into varchar columns, timestamps with NOW()
     $insert = $eventPdo->prepare("
         INSERT INTO event_scan_logs_food (
             event_id, user_id, attendee_id, date, time, print_type, status, is_delete, scan_for, created_at, updated_at
