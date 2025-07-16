@@ -1,26 +1,31 @@
 <?php
 $mainHost = 'localhost';
 $mainDb   = 'prop_propass';
-$user     = 'root';
-$pass     = '';
+$user     = 'root'; // Replace with your actual database username
+$pass     = '';     // Replace with your actual database password
 $charset  = 'utf8mb4';
 
 $mainDsn = "mysql:host=$mainHost;dbname=$mainDb;charset=$charset";
 $options = [
     PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
     PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES   => false,
 ];
 
 try {
     $mainPdo = new PDO($mainDsn, $user, $pass, $options);
 
     $event_id = $_GET['event_id'] ?? $_POST['event_id'] ?? null;
-    if (!$event_id) throw new Exception('Missing event_id');
+    if (!$event_id) {
+        throw new Exception('Missing event_id');
+    }
 
     $stmt = $mainPdo->prepare("SELECT short_name FROM events WHERE id = :eid LIMIT 1");
     $stmt->execute([':eid' => $event_id]);
     $event = $stmt->fetch();
-    if (!$event) throw new Exception('Event not found');
+    if (!$event) {
+        throw new Exception('Event not found');
+    }
     $short = strtolower($event['short_name']);
 
     $eventDb  = "prop_propass_event_$short";
@@ -31,7 +36,7 @@ try {
         SELECT user_id, attendee_id, print_type, scan_for, date, time
         FROM event_scan_logs_food
         WHERE event_id = :eid
-          AND scan_for IN ('lunch', 'dinner')
+          AND scan_for IN ('lunch', 'dinner') -- Only 'lunch' and 'dinner'
           AND is_delete = 0
         ORDER BY date ASC, time ASC
     ");
@@ -39,7 +44,7 @@ try {
     $scans = $scanStmt->fetchAll();
 
     $scanMap = [];
-    $masterCount = ['lunch' => 0, 'dinner' => 0];
+    $masterCount = ['lunch' => 0, 'dinner' => 0]; // Only lunch and dinner master counts
     $totals = [
         'lunch_taken' => 0,
         'dinner_taken' => 0,
@@ -50,10 +55,10 @@ try {
     foreach ($scans as $s) {
         $key = $s['user_id'] . ':' . $s['attendee_id'];
         $dt = $s['date'] . ' ' . $s['time'];
-        $ptype = strtolower($s['print_type']);
-        $meal = strtolower($s['scan_for']);
+        $ptype = strtolower(trim($s['print_type']));
+        $meal = strtolower(trim($s['scan_for']));
 
-        if (!in_array($meal, ['lunch', 'dinner'])) continue;
+        if (!in_array($meal, ['lunch', 'dinner'])) continue; // Ensure only lunch/dinner are processed
 
         if ($ptype === 'master') {
             $masterCount[$meal]++;
@@ -61,11 +66,11 @@ try {
         }
 
         if (!isset($scanMap[$key])) {
-            $scanMap[$key] = ['lunch' => [], 'dinner' => []];
+            $scanMap[$key] = ['lunch' => [], 'dinner' => []]; // Initialize only for lunch/dinner
         }
 
         $scanMap[$key][$meal][] = [
-            'type' => $ptype,
+            'type'      => $ptype,
             'date_time' => $dt,
         ];
     }
@@ -110,48 +115,48 @@ try {
             $attendeeName = $shortName !== '' ? trim("$prefix $shortName") : $fullName;
         }
 
-        foreach (['lunch', 'dinner'] as $meal) {
+        foreach (['lunch', 'dinner'] as $meal) { // Iterate only for lunch and dinner
             $entries = $scanMap[$key][$meal] ?? [];
 
             if (empty($entries)) {
                 $report[] = [
-                    'user_id' => $reg['user_id'],
+                    'user_id'     => $reg['user_id'],
                     'attendee_id' => $reg['attendee_id'],
                     'attendee_name' => $attendeeName,
                     'category_name' => $reg['category_name'] ?? 'Unknown Category',
-                    'meal' => ucfirst($meal),
-                    'status' => 'Not Taken',
-                    'taken_at' => null,
+                    'meal'        => ucfirst($meal),
+                    'status'      => 'Not Taken',
+                    'taken_at'    => null,
                 ];
                 continue;
             }
 
-            $autoRecorded = false;
+            $hasAutoTaken = false;
             foreach ($entries as $entry) {
                 if ($entry['type'] === 'auto') {
-                    $totals[$meal . '_taken']++;
-                    if (!$autoRecorded) {
-                        $autoRecorded = true;
+                    if (!$hasAutoTaken) {
+                        $totals[$meal . '_taken']++;
                         $report[] = [
-                            'user_id' => $reg['user_id'],
+                            'user_id'     => $reg['user_id'],
                             'attendee_id' => $reg['attendee_id'],
                             'attendee_name' => $attendeeName,
                             'category_name' => $reg['category_name'] ?? 'Unknown Category',
-                            'meal' => ucfirst($meal),
-                            'status' => 'Meal Taken (Auto)',
-                            'taken_at' => $entry['date_time'],
+                            'meal'        => ucfirst($meal),
+                            'status'      => 'Meal Taken (Auto)',
+                            'taken_at'    => $entry['date_time'],
                         ];
+                        $hasAutoTaken = true;
                     }
                 } elseif ($entry['type'] === 'manual') {
                     $totals[$meal . '_retaken']++;
                     $report[] = [
-                        'user_id' => $reg['user_id'],
+                        'user_id'     => $reg['user_id'],
                         'attendee_id' => $reg['attendee_id'],
                         'attendee_name' => $attendeeName,
                         'category_name' => $reg['category_name'] ?? 'Unknown Category',
-                        'meal' => ucfirst($meal),
-                        'status' => 'Meal Re-Taken (Manual)',
-                        'taken_at' => $entry['date_time'],
+                        'meal'        => ucfirst($meal),
+                        'status'      => 'Meal Re-Taken (Manual)',
+                        'taken_at'    => $entry['date_time'],
                     ];
                 }
             }
@@ -160,20 +165,21 @@ try {
 
     header('Content-Type: application/json');
     echo json_encode([
-        'event_id' => $event_id,
-        'short_name' => $short,
-        'total_lunch' => $totals['lunch_taken'] + $totals['lunch_retaken'] + $masterCount['lunch'],
-        'total_dinner' => $totals['dinner_taken'] + $totals['dinner_retaken'] + $masterCount['dinner'],
-        'master_qr_lunch' => $masterCount['lunch'],
+        'event_id'         => $event_id,
+        'short_name'       => $short,
+        'total_lunch'      => $totals['lunch_taken'] + $totals['lunch_retaken'] + $masterCount['lunch'],
+        'total_dinner'     => $totals['dinner_taken'] + $totals['dinner_retaken'] + $masterCount['dinner'],
+        'master_qr_lunch'  => $masterCount['lunch'],
         'master_qr_dinner' => $masterCount['dinner'],
-        'lunch_retaken' => $totals['lunch_retaken'],
-        'dinner_retaken' => $totals['dinner_retaken'],
-        'lunch_taken' => $totals['lunch_taken'],
-        'dinner_taken' => $totals['dinner_taken'],
-        'report' => $report,
+        'lunch_retaken'    => $totals['lunch_retaken'],
+        'dinner_retaken'   => $totals['dinner_retaken'],
+        'lunch_taken'      => $totals['lunch_taken'],
+        'dinner_taken'     => $totals['dinner_taken'],
+        'report'           => $report,
     ], JSON_PRETTY_PRINT);
 
 } catch (Exception $e) {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
 }
+?>
