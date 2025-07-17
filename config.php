@@ -2,7 +2,7 @@
 $servername = "localhost";
 $username = "root";
 $password = "";
-$mainDb = "prop_propass"; // ✅ define this
+$mainDb = "prop_propass";
 $conn = new mysqli($servername, $username, $password, $mainDb);
 
 if ($conn->connect_error) {

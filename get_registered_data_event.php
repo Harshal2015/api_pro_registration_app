@@ -3,8 +3,8 @@ header('Content-Type: application/json');
 
 require_once 'config.php';
 require_once 'connect_event_database.php';
+require_once 'tables.php';
 
-// Get input
 $input = json_decode(file_get_contents("php://input"), true);
 $event_id = isset($input['event_id']) ? intval($input['event_id']) : 0;
 $page = isset($input['page']) ? max(1, intval($input['page'])) : 1;
@@ -15,7 +15,6 @@ if (!$event_id) {
     exit();
 }
 
-// Connect to event DB
 $connectionResult = connectEventDb($event_id);
 if (!$connectionResult['success']) {
     echo json_encode($connectionResult);
@@ -25,10 +24,8 @@ if (!$connectionResult['success']) {
 $eventConn = $connectionResult['conn'];
 $eventDb = $connectionResult['db_name'];
 
-// Pagination offset
 $offset = ($page - 1) * $page_size;
 
-// Get total count
 $countQuery = "SELECT COUNT(*) as total_count FROM {$eventDb}.event_registrations WHERE is_deleted = 0 AND event_id = ?";
 $countStmt = $eventConn->prepare($countQuery);
 $countStmt->bind_param("i", $event_id);
@@ -37,14 +34,12 @@ $countResult = $countStmt->get_result();
 $totalCount = $countResult->fetch_assoc()['total_count'] ?? 0;
 $countStmt->close();
 
-// If no data, return early
 if ($totalCount === 0) {
     echo json_encode(['success' => true, 'total_count' => 0, 'data' => []]);
     $eventConn->close();
     exit();
 }
 
-// Main query
 $limitClause = ($page_size === 0) ? "" : "LIMIT ? OFFSET ?";
 $query = "
     SELECT 
@@ -56,7 +51,7 @@ $query = "
         a.area_of_interest, a.profile_photo, a.birth_date, a.bio,
         c.name AS category_name, c.is_lunch, c.is_dinner, c.is_kit, c.is_certificate, c.is_travel
     FROM {$eventDb}.event_registrations er
-    LEFT JOIN {$mainDb}.attendees_1 a ON er.user_id = a.id
+    LEFT JOIN {$mainDb}." . TABLE_ATTENDEES . " a ON er.user_id = a.id
     LEFT JOIN {$eventDb}.event_categories c ON er.category_id = c.id
     WHERE er.is_deleted = 0 AND er.event_id = ?
     $limitClause

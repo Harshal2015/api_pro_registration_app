@@ -9,7 +9,6 @@ function connectEventDb($event_id) {
         return ['success' => false, 'message' => 'Event ID is required'];
     }
 
-    // Get short_name from main DB
     $eventStmt = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
     $eventStmt->bind_param("i", $event_id);
     $eventStmt->execute();
@@ -22,10 +21,8 @@ function connectEventDb($event_id) {
     $event = $eventResult->fetch_assoc();
     $shortName = $event['short_name'];
 
-    // 🛠 Correct full DB name
     $eventDb = "prop_propass_event_" . $shortName;
 
-    // Connect to event-specific DB
     $eventConn = new mysqli($servername, $username, $password, $eventDb);
     if ($eventConn->connect_error) {
         return ['success' => false, 'message' => "Failed to connect to event DB: $eventDb"];

@@ -2,7 +2,10 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
-$mainDb = ['host' => 'localhost', 'db' => 'prop_propass', 'user' => 'root', 'pass' => ''];
+require_once 'config.php';
+require_once 'connect_event_database.php';
+require_once 'tables.php';
+
 
 $input = json_decode(file_get_contents('php://input'), true);
 $name = trim($input['name'] ?? '');
@@ -14,10 +17,10 @@ if (!$email && !$phone) {
     exit;
 }
 
-
 try {
-    $pdoMain = new PDO("mysql:host={$mainDb['host']};dbname={$mainDb['db']};charset=utf8mb4",
-        $mainDb['user'], $mainDb['pass'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    $pdoMain = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4", DB_USER, DB_PASSWORD, [
+        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+    ]);
 } catch (PDOException $e) {
     echo json_encode(['success' => false, 'message' => 'Main DB connection failed: ' . $e->getMessage()]);
     exit;
@@ -30,17 +33,14 @@ function esc($str) {
     return str_replace(['%', '_'], ['\%', '\_'], $str);
 }
 
-
 if ($name) {
-    $where[] = "(first_name LIKE :last_name OR secondary_email LIKE :name)";
-    $params[':name'] = '%' . esc($email) . '%';
+    $where[] = "(first_name LIKE :name OR secondary_email LIKE :name)";
+    $params[':name'] = '%' . esc($name) . '%';
 }
-
 if ($email) {
     $where[] = "(primary_email_address LIKE :email OR secondary_email LIKE :email)";
     $params[':email'] = '%' . esc($email) . '%';
 }
-
 if ($phone) {
     $where[] = "(primary_phone_number LIKE :phone OR secondary_mobile_number LIKE :phone)";
     $params[':phone'] = '%' . esc($phone) . '%';
@@ -49,39 +49,15 @@ if ($phone) {
 $whereSql = count($where) > 0 ? '(' . implode(' OR ', $where) . ") AND is_deleted = 0" : 'is_deleted = 0';
 
 $sql = "SELECT 
-    id,
-    unique_id,
-    prefix,
-    first_name,
-    last_name,
-    short_name,
-    primary_email_address,
-    primary_email_address_verified,
-    secondary_email,
-    country_code,
-    primary_phone_number,
-    primary_phone_number_verified,
-    secondary_mobile_number,
-    city,
-    state,
-    country,
-    pincode,
-    profession,
-    workplace_name,
-    designation,
-    professional_registration_number,
-    registration_state,
-    registration_type,
-    added_by,
-    area_of_interest,
-    is_verified,
-    profile_photo,
-    birth_date,
-    bio,
-    is_deleted,
-    created_at,
-    modified_at
-FROM attendees_1 
+    id, unique_id, prefix, first_name, last_name, short_name,
+    primary_email_address, primary_email_address_verified, secondary_email,
+    country_code, primary_phone_number, primary_phone_number_verified,
+    secondary_mobile_number, city, state, country, pincode,
+    profession, workplace_name, designation, professional_registration_number,
+    registration_state, registration_type, added_by, area_of_interest,
+    is_verified, profile_photo, birth_date, bio,
+    is_deleted, created_at, modified_at
+FROM " . TABLE_ATTENDEES . "
 WHERE $whereSql
 LIMIT 50";
 
@@ -97,23 +73,30 @@ if (!$attendees) {
 $eventDbs = $pdoMain->query("SHOW DATABASES LIKE 'prop_propass_event_%'")->fetchAll(PDO::FETCH_COLUMN);
 $registrationsMap = [];
 
-foreach ($eventDbs as $eventDb) {
-    try {
-        $pdoEv = new PDO("mysql:host={$mainDb['host']};dbname=$eventDb;charset=utf8mb4",
-            $mainDb['user'], $mainDb['pass'], [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+$ids = array_column($attendees, 'id');
+$in = implode(',', array_map('intval', $ids));
+if (!$in) {
+    echo json_encode(['success' => true, 'attendees' => $attendees]);
+    exit;
+}
 
-        $shortName = str_replace('prop_propass_event_', '', $eventDb);
-        $ids = array_column($attendees, 'id');
-        $in = implode(',', array_map('intval', $ids));
-        if (!$in) continue;
+foreach ($eventDbs as $eventDbName) {
+    $shortName = str_replace('prop_propass_event_', '', $eventDbName);
+    $eventConnResult = connectEventDbByShortName($shortName);
+    if (!$eventConnResult['success']) continue;
 
-        $qr = $pdoEv->query("SELECT user_id FROM event_registrations WHERE user_id IN ($in) AND is_deleted = 0");
-        foreach ($qr->fetchAll(PDO::FETCH_COLUMN) as $uid) {
-            $registrationsMap[$uid][] = $shortName;
+    $eventConn = $eventConnResult['conn'];
+
+    $sqlCheck = "SELECT user_id FROM event_registrations WHERE user_id IN ($in) AND is_deleted = 0";
+    $result = $eventConn->query($sqlCheck);
+
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $registrationsMap[$row['user_id']][] = $shortName;
         }
-    } catch (PDOException $e) {
-        continue;
     }
+
+    $eventConn->close();
 }
 
 foreach ($attendees as &$attendee) {

@@ -1,31 +1,18 @@
 <?php
-date_default_timezone_set('Asia/Kolkata');  
+date_default_timezone_set('Asia/Kolkata');
 
-$mainHost = 'localhost';
-$mainDb   = 'prop_propass';
-$user     = 'root';
-$pass     = '';
-$charset  = 'utf8mb4';
+require_once 'config.php';          
+require_once 'connect_event_database.php';
 
-$mainDsn = "mysql:host=$mainHost;dbname=$mainDb;charset=$charset";
-$options = [
-    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-];
+header('Content-Type: application/json');
 
 try {
-    $mainPdo = new PDO($mainDsn, $user, $pass, $options);
-
     $event_id    = $_POST['event_id'] ?? null;
     $user_id     = $_POST['user_id'] ?? null;
     $attendee_id = $_POST['attendee_id'] ?? null;
-
-    $date = date('Y-m-d');
-    $time = date('H:i:s');
-
+    $print_type  = $_POST['print_type'] ?? null;
     $status      = $_POST['status'] ?? 1;
     $is_delete   = $_POST['is_delete'] ?? 0;
-    $print_type  = $_POST['print_type'] ?? null;
 
     if (!$event_id || (!$user_id && $print_type !== 'Master QR') || (!$attendee_id && $print_type !== 'Master QR')) {
         throw new Exception("Missing required fields: event_id" .
@@ -34,6 +21,8 @@ try {
         );
     }
 
+    $date = date('Y-m-d');
+    $time = date('H:i:s');
     $scanTimestamp = strtotime($time);
     $lunchStart    = strtotime('11:00:00');
     $lunchEnd      = strtotime('15:59:59');
@@ -53,41 +42,38 @@ try {
         $scan_for = 'Lunch';
     }
 
-    $stmt = $mainPdo->prepare("SELECT short_name FROM events WHERE id = :event_id LIMIT 1");
-    $stmt->execute([':event_id' => $event_id]);
-    $event = $stmt->fetch();
-
-    if (!$event) {
+    $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ? LIMIT 1");
+    $stmt->bind_param("i", $event_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows === 0) {
         throw new Exception("Event not found");
     }
+    $event = $result->fetch_assoc();
+    $stmt->close();
 
     $shortName = strtolower($event['short_name']);
-    $eventDb   = "prop_propass_event_$shortName";
-    $eventDsn  = "mysql:host=$mainHost;dbname=$eventDb;charset=$charset";
-    $eventPdo  = new PDO($eventDsn, $user, $pass, $options);
+
+    $eventResult = connectEventDb($event_id);
+    if (!$eventResult['success']) throw new Exception($eventResult['message']);
+    $eventConn = $eventResult['conn'];
 
     if ($print_type !== 'Master QR') {
-        $checkStmt = $eventPdo->prepare("
+        $checkStmt = $eventConn->prepare("
             SELECT id FROM event_scan_logs_food 
-            WHERE event_id = :event_id
-              AND user_id = :user_id
-              AND attendee_id = :attendee_id
-              AND date = :date
-              AND scan_for = :scan_for
+            WHERE event_id = ?
+              AND user_id = ?
+              AND attendee_id = ?
+              AND date = ?
+              AND scan_for = ?
               AND is_delete = 0
             LIMIT 1
         ");
-        $checkStmt->execute([
-            ':event_id'    => $event_id,
-            ':user_id'     => $user_id,
-            ':attendee_id' => $attendee_id,
-            ':date'        => $date,
-            ':scan_for'    => $scan_for,
-        ]);
+        $checkStmt->bind_param("iiiss", $event_id, $user_id, $attendee_id, $date, $scan_for);
+        $checkStmt->execute();
+        $checkResult = $checkStmt->get_result();
 
-        $alreadyScanned = $checkStmt->fetch();
-
-        if ($alreadyScanned && $print_type !== 'Reissued') {
+        if ($checkResult->num_rows > 0 && $print_type !== 'Reissued') {
             echo json_encode([
                 'success' => false,
                 'require_permission' => true,
@@ -96,37 +82,38 @@ try {
             ]);
             exit;
         }
+        $checkStmt->close();
     }
 
     if (!$print_type) {
         $print_type = 'Issued';
     }
 
-    $insert = $eventPdo->prepare("
+    $insertStmt = $eventConn->prepare("
         INSERT INTO event_scan_logs_food (
             event_id, user_id, attendee_id, date, time, print_type, status, is_delete, scan_for, created_at, updated_at
-        ) VALUES (
-            :event_id, :user_id, :attendee_id, :date, :time, :print_type, :status, :is_delete, :scan_for, NOW(), NOW()
-        )
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     ");
-
-    $insert->execute([
-        ':event_id'    => $event_id,
-        ':user_id'     => $user_id,
-        ':attendee_id' => $attendee_id,
-        ':date'        => $date,
-        ':time'        => $time,
-        ':print_type'  => $print_type,
-        ':status'      => $status,
-        ':is_delete'   => $is_delete,
-        ':scan_for'    => $scan_for,
-    ]);
+    $insertStmt->bind_param(
+        "iiisssiis",
+        $event_id,
+        $user_id,
+        $attendee_id,
+        $date,
+        $time,
+        $print_type,
+        $status,
+        $is_delete,
+        $scan_for
+    );
+    $insertStmt->execute();
+    $insertStmt->close();
 
     echo json_encode([
-        'success'     => true,
-        'message'     => "Scan logged successfully as $print_type.",
-        'print_type'  => $print_type,
-        'scan_for'    => $scan_for,
+        'success'    => true,
+        'message'    => "Scan logged successfully as $print_type.",
+        'print_type' => $print_type,
+        'scan_for'   => $scan_for,
     ]);
 
 } catch (Exception $e) {

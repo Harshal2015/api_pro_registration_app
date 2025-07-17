@@ -1,115 +1,97 @@
 <?php
-// Configuration
-$mainHost = 'localhost';
-$mainDb   = 'prop_propass';
-$user     = 'root';
-$pass     = '';
-$charset  = 'utf8mb4';
+header("Content-Type: application/json");
+date_default_timezone_set('Asia/Kolkata');
 
-$mainDsn = "mysql:host=$mainHost;dbname=$mainDb;charset=$charset";
-$options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-];
+require_once 'config.php';           
+require_once 'connect_event_database.php'; 
+require_once 'tables.php';
 
 try {
-    $mainPdo = new PDO($mainDsn, $user, $pass, $options);
-
     $event_id = $_GET['event_id'] ?? $_POST['event_id'] ?? null;
-    if (!$event_id) throw new Exception('Missing event_id');
+    if (!$event_id) throw new Exception("Missing event_id");
 
-    // Get event short name
-    $stmt = $mainPdo->prepare("SELECT short_name FROM events WHERE id = :eid LIMIT 1");
-    $stmt->execute([':eid' => $event_id]);
-    $event = $stmt->fetch();
-    if (!$event) throw new Exception('Event not found');
+    $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
+    $stmt->bind_param("i", $event_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows === 0) throw new Exception("Event not found");
+
+    $event = $result->fetch_assoc();
     $short = strtolower($event['short_name']);
+    $stmt->close();
 
-    // Connect to event-specific DB
-    $eventDb  = "prop_propass_event_$short";
-    $eventDsn = "mysql:host=$mainHost;dbname=$eventDb;charset=$charset";
-    $eventPdo = new PDO($eventDsn, $user, $pass, $options);
+    $eventResult = connectEventDb($event_id);
+    if (!$eventResult['success']) throw new Exception($eventResult['message']);
+    $eventConn = $eventResult['conn'];
 
-    // Fetch all scans (badge scans only, non-deleted)
-    $scanStmt = $eventPdo->prepare("
+    $scanStmt = $eventConn->prepare("
         SELECT user_id, attendee_id, print_type, date, time
         FROM event_scan_logg
-        WHERE event_id = :eid
-          AND scan_for = 'badge'
-          AND is_delete = 0
+        WHERE event_id = ? AND scan_for = 'badge' AND is_delete = 0
         ORDER BY date ASC, time ASC
     ");
-    $scanStmt->execute([':eid' => $event_id]);
-    $scans = $scanStmt->fetchAll();
+    $scanStmt->bind_param("i", $event_id);
+    $scanStmt->execute();
+    $scanResult = $scanStmt->get_result();
 
-    /*
-    We'll store scan data separately for Auto and Manual:
-    scanMap[user_id:attendee_id] = [
-       'auto' => ['date_time' => ..., 'status' => 'Collected (Auto)'] or null,
-       'manual' => array of ['date_time' => ..., 'status' => 'Reissued (Manual)']
-    ]
-    */
     $scanMap = [];
-
-    foreach ($scans as $s) {
+    while ($s = $scanResult->fetch_assoc()) {
         $key = $s['user_id'] . ':' . $s['attendee_id'];
         $dt = $s['date'] . ' ' . $s['time'];
         $ptype = strtolower($s['print_type']);
 
         if (!isset($scanMap[$key])) {
-            $scanMap[$key] = [
-                'issued' => null,
-                'reissued' => [],
-            ];
+            $scanMap[$key] = ['issued' => null, 'reissued' => []];
         }
 
-        // Keep earliest auto scan only
         if ($ptype === 'issued') {
             if ($scanMap[$key]['issued'] === null || $dt < $scanMap[$key]['issued']['date_time']) {
-                $scanMap[$key]['issued'] = [
-                    'status' => 'Collected',
-                    'date_time' => $dt,
-                ];
+                $scanMap[$key]['issued'] = ['status' => 'Collected', 'date_time' => $dt];
             }
-        }
-
-        // Keep all manual scans
-        if ($ptype === 'reissued') {
-            $scanMap[$key]['reissued'][] = [
-                'status' => 'Reissued',
-                'date_time' => $dt,
-            ];
+        } elseif ($ptype === 'reissued') {
+            $scanMap[$key]['reissued'][] = ['status' => 'Reissued', 'date_time' => $dt];
         }
     }
+    $scanStmt->close();
 
-    // Get all event registrations
-    $regStmt = $eventPdo->prepare("
+    $regStmt = $eventConn->prepare("
         SELECT er.user_id, er.id AS attendee_id, ec.name AS category_name
         FROM event_registrations er
         LEFT JOIN event_categories ec ON er.category_id = ec.id
-        WHERE er.event_id = :eid
-          AND er.is_deleted = 0
+        WHERE er.event_id = ? AND er.is_deleted = 0
     ");
-    $regStmt->execute([':eid' => $event_id]);
-    $registrations = $regStmt->fetchAll();
+    $regStmt->bind_param("i", $event_id);
+    $regStmt->execute();
+    $regResult = $regStmt->get_result();
 
-    // Fetch attendee details from main DB including prefix
-    $userIds = array_unique(array_column($registrations, 'user_id'));
+    $registrations = [];
+    $userIds = [];
+    while ($reg = $regResult->fetch_assoc()) {
+        $registrations[] = $reg;
+        $userIds[] = $reg['user_id'];
+    }
+    $regStmt->close();
+
+    $userIds = array_unique($userIds);
     $attendees = [];
+
     if (!empty($userIds)) {
         $placeholders = implode(',', array_fill(0, count($userIds), '?'));
-        $attStmt = $mainPdo->prepare("
+        $types = str_repeat('i', count($userIds));
+        $attStmt = $conn->prepare("
             SELECT id, prefix, short_name, first_name, last_name
-            FROM attendees_1
+            FROM " . TABLE_ATTENDEES . "
             WHERE id IN ($placeholders)
         ");
-        $attStmt->execute($userIds);
-        foreach ($attStmt->fetchAll() as $att) {
-            $attendees[$att['id']] = $att;
+        $attStmt->bind_param($types, ...$userIds);
+        $attStmt->execute();
+        $attResult = $attStmt->get_result();
+        while ($row = $attResult->fetch_assoc()) {
+            $attendees[$row['id']] = $row;
         }
+        $attStmt->close();
     }
 
-    // Build final report
     $report = [];
     foreach ($registrations as $reg) {
         $key = $reg['user_id'] . ':' . $reg['attendee_id'];
@@ -124,7 +106,6 @@ try {
 
             $fullName = trim("$prefix $firstName $lastName");
             if ($shortName !== '') {
-                // Always include prefix before short_name if prefix exists
                 $attendeeName = trim("$prefix $shortName");
             } else {
                 $attendeeName = $fullName;
@@ -137,27 +118,18 @@ try {
 
         $statusEntries = [];
 
-        // Add earliest auto collected scan if exists
-        if (isset($scanMap[$key]['issued']) && $scanMap[$key]['issued'] !== null) {
+        if (!empty($scanMap[$key]['issued'])) {
             $statusEntries[] = $scanMap[$key]['issued'];
         }
 
-        // Add all manual reissued scans
-        if (isset($scanMap[$key]['reissued']) && count($scanMap[$key]['reissued']) > 0) {
-            foreach ($scanMap[$key]['reissued'] as $manualEntry) {
-                $statusEntries[] = $manualEntry;
-            }
+        foreach ($scanMap[$key]['reissued'] ?? [] as $re) {
+            $statusEntries[] = $re;
         }
 
-        // If no scans, add Not Collected
         if (empty($statusEntries)) {
-            $statusEntries[] = [
-                'status' => 'Not Collected',
-                'date_time' => null,
-            ];
+            $statusEntries[] = ['status' => 'Not Collected', 'date_time' => null];
         }
 
-        // Add each status entry as separate report row
         foreach ($statusEntries as $entry) {
             $report[] = [
                 'user_id'       => $reg['user_id'],
@@ -170,31 +142,23 @@ try {
         }
     }
 
-    // Count totals
     $total = count($registrations);
-
-    // Unique user+attendee pairs who collected anything (auto or manual)
-    $collectedUserAttendee = [];
-    // Count of all manual scans (reissued badges)
+    $collectedKeys = [];
     $totalReissued = 0;
 
     foreach ($report as $row) {
         $key = $row['user_id'] . ':' . $row['attendee_id'];
-
         if ($row['status'] !== 'Not Collected') {
-            $collectedUserAttendee[$key] = true;
+            $collectedKeys[$key] = true;
         }
-
         if ($row['status'] === 'Reissued') {
             $totalReissued++;
         }
     }
 
-    $totalCollected = count($collectedUserAttendee);
+    $totalCollected = count($collectedKeys);
     $totalNotCollected = $total - $totalCollected;
 
-    // Output JSON
-    header('Content-Type: application/json');
     echo json_encode([
         'event_id'            => $event_id,
         'short_name'          => $short,

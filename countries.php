@@ -3,26 +3,19 @@
 header("Access-Control-Allow-Origin: *");
 header("Content-Type: application/json");
 
-$host = "localhost";
-$user = "root";
-$password = "";
-$dbname = "prop_propass";
-
-// Create connection
-$conn = new mysqli($host, $user, $password, $dbname);
-
-// Check connection
-if ($conn->connect_error) {
-    http_response_code(500);
-    echo json_encode(["status" => "error", "message" => "Database connection failed"]);
-    exit();
-}
-
-// Query the country_codes table
+require_once 'config.php';
 $sql = "SELECT id, country_name, dial_code FROM country_codes ORDER BY country_name ASC";
 $result = $conn->query($sql);
 
-// Check for results
+if ($result === false) {
+    http_response_code(500);
+    echo json_encode([
+        "status" => "error",
+        "message" => "Failed to fetch country codes"
+    ]);
+    exit();
+}
+
 if ($result->num_rows > 0) {
     $countries = [];
 

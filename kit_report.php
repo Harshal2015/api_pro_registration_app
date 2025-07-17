@@ -1,52 +1,48 @@
 <?php
-// Configuration
-$mainHost = 'localhost';
-$mainDb   = 'prop_propass';
-$user     = 'root';
-$pass     = '';
-$charset  = 'utf8mb4';
+header("Content-Type: application/json");
+date_default_timezone_set('Asia/Kolkata');
 
-$mainDsn = "mysql:host=$mainHost;dbname=$mainDb;charset=$charset";
-$options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-];
+require_once 'config.php';          
+require_once 'connect_event_database.php';
+require_once 'tables.php';
+
 
 try {
-    $mainPdo = new PDO($mainDsn, $user, $pass, $options);
-
     $event_id = $_GET['event_id'] ?? $_POST['event_id'] ?? null;
     if (!$event_id) throw new Exception('Missing event_id');
 
-    // Fetch event short name
-    $stmt = $mainPdo->prepare("SELECT short_name FROM events WHERE id = :eid LIMIT 1");
-    $stmt->execute([':eid' => $event_id]);
-    $event = $stmt->fetch();
-    if (!$event) throw new Exception('Event not found');
+    $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ? LIMIT 1");
+    $stmt->bind_param("i", $event_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    if ($result->num_rows === 0) throw new Exception('Event not found');
+    $event = $result->fetch_assoc();
     $short = strtolower($event['short_name']);
+    $stmt->close();
 
-    // Connect to event-specific DB
-    $eventDb  = "prop_propass_event_$short";
-    $eventDsn = "mysql:host=$mainHost;dbname=$eventDb;charset=$charset";
-    $eventPdo = new PDO($eventDsn, $user, $pass, $options);
+    $eventResult = connectEventDb($event_id);
+    if (!$eventResult['success']) throw new Exception($eventResult['message']);
+    $eventConn = $eventResult['conn'];
 
-    // Fetch kit scans (kit scan, not deleted)
-    $scanStmt = $eventPdo->prepare("
+    $scanStmt = $eventConn->prepare("
         SELECT user_id, attendee_id, print_type, date, time
         FROM event_scan_logg
-        WHERE event_id = :eid
-          AND scan_for = 'kit'
-          AND is_delete = 0
+        WHERE event_id = ? AND scan_for = 'kit' AND is_delete = 0
         ORDER BY date ASC, time ASC
     ");
-    $scanStmt->execute([':eid' => $event_id]);
-    $scans = $scanStmt->fetchAll();
+    $scanStmt->bind_param("i", $event_id);
+    $scanStmt->execute();
+    $scanResult = $scanStmt->get_result();
+    $scans = [];
+    while ($row = $scanResult->fetch_assoc()) {
+        $scans[] = $row;
+    }
+    $scanStmt->close();
 
-    // Build scan map structure
     $scanMap = [];
     foreach ($scans as $s) {
-        $key = "{$s['user_id']}:{$s['attendee_id']}";
-        $dt = "{$s['date']} {$s['time']}";
+        $key = $s['user_id'] . ':' . $s['attendee_id'];
+        $dt = $s['date'] . ' ' . $s['time'];
         $ptype = strtolower($s['print_type']);
 
         if (!isset($scanMap[$key])) {
@@ -62,35 +58,45 @@ try {
         }
     }
 
-    // Fetch all registrations
-    $regStmt = $eventPdo->prepare("
+    $regStmt = $eventConn->prepare("
         SELECT er.user_id, er.id AS attendee_id, ec.name AS category_name
         FROM event_registrations er
         LEFT JOIN event_categories ec ON er.category_id = ec.id
-        WHERE er.event_id = :eid AND er.is_deleted = 0
+        WHERE er.event_id = ? AND er.is_deleted = 0
     ");
-    $regStmt->execute([':eid' => $event_id]);
-    $registrations = $regStmt->fetchAll();
+    $regStmt->bind_param("i", $event_id);
+    $regStmt->execute();
+    $regResult = $regStmt->get_result();
+    $registrations = [];
+    $userIds = [];
 
-    // Fetch attendee details
-    $userIds = array_unique(array_column($registrations, 'user_id'));
+    while ($row = $regResult->fetch_assoc()) {
+        $registrations[] = $row;
+        $userIds[] = $row['user_id'];
+    }
+    $regStmt->close();
+    $userIds = array_unique($userIds);
+
     $attendees = [];
-    if ($userIds) {
-        $ph = implode(',', array_fill(0, count($userIds), '?'));
-        $attStmt = $mainPdo->prepare("SELECT id, prefix, short_name, first_name, last_name FROM attendees_1 WHERE id IN ($ph)");
-        $attStmt->execute($userIds);
-        foreach ($attStmt->fetchAll() as $att) {
+    if (!empty($userIds)) {
+        $placeholders = implode(',', array_fill(0, count($userIds), '?'));
+        $types = str_repeat('i', count($userIds));
+        $query = "SELECT id, prefix, short_name, first_name, last_name FROM " . TABLE_ATTENDEES . " WHERE id IN ($placeholders)";
+        $attStmt = $conn->prepare($query);
+        $attStmt->bind_param($types, ...$userIds);
+        $attStmt->execute();
+        $attResult = $attStmt->get_result();
+        while ($att = $attResult->fetch_assoc()) {
             $attendees[$att['id']] = $att;
         }
+        $attStmt->close();
     }
 
-    // Build report
     $report = [];
     foreach ($registrations as $reg) {
-        $key = "{$reg['user_id']}:{$reg['attendee_id']}";
-
-        // Determine attendee name
+        $key = $reg['user_id'] . ':' . $reg['attendee_id'];
         $attName = 'Unknown Attendee';
+
         if (isset($attendees[$reg['user_id']])) {
             $a = $attendees[$reg['user_id']];
             $prefix = trim($a['prefix'] ?? '');
@@ -103,9 +109,12 @@ try {
             } else {
                 $attName = trim("$prefix $firstName $lastName");
             }
+
+            if (empty($attName)) {
+                $attName = 'Unknown Attendee';
+            }
         }
 
-        // Safely get scan entries
         $entrySet = $scanMap[$key] ?? ['issued' => null, 'reissued' => []];
         $entries = [];
 
@@ -113,41 +122,43 @@ try {
             $entries[] = $entrySet['issued'];
         }
 
-        if (!empty($entrySet['reissued']) && is_array($entrySet['reissued'])) {
-            foreach ($entrySet['reissued'] as $manualEntry) {
-                $entries[] = $manualEntry;
-            }
+        foreach ($entrySet['reissued'] as $r) {
+            $entries[] = $r;
         }
 
         if (empty($entries)) {
             $entries[] = ['status' => 'Kit Not Collected', 'date_time' => null];
         }
 
-        foreach ($entries as $e) {
+        foreach ($entries as $entry) {
             $report[] = [
                 'user_id'       => $reg['user_id'],
                 'attendee_id'   => $reg['attendee_id'],
                 'attendee_name' => $attName,
                 'category_name' => $reg['category_name'] ?? 'Unknown Category',
-                'status'        => $e['status'],
-                'collected_at'  => $e['date_time'],
+                'status'        => $entry['status'],
+                'collected_at'  => $entry['date_time'],
             ];
         }
     }
 
-    // Totals
     $total = count($registrations);
     $collectedKeys = [];
     $reissued = 0;
+
     foreach ($report as $r) {
-        $k = "{$r['user_id']}:{$r['attendee_id']}";
-        if ($r['status'] !== 'Kit Not Collected') $collectedKeys[$k] = true;
-        if (stripos($r['status'], 'Reissued') !== false) $reissued++;
+        $key = $r['user_id'] . ':' . $r['attendee_id'];
+        if ($r['status'] !== 'Kit Not Collected') {
+            $collectedKeys[$key] = true;
+        }
+        if (stripos($r['status'], 'Reissued') !== false) {
+            $reissued++;
+        }
     }
+
     $colCount = count($collectedKeys);
     $notCount = $total - $colCount;
 
-    header('Content-Type: application/json');
     echo json_encode([
         'event_id'            => $event_id,
         'short_name'          => $short,
