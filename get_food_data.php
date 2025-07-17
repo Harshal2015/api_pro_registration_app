@@ -111,7 +111,6 @@ try {
         $attStmt->close();
     }
 
-    // Build report
     $report = [];
     foreach ($registrations as $reg) {
         $key = $reg['user_id'] . ':' . $reg['attendee_id'];

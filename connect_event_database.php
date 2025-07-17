@@ -1,5 +1,4 @@
 <?php
-// connect_event_db.php
 require_once 'config.php';
 
 function connectEventDb($event_id) {

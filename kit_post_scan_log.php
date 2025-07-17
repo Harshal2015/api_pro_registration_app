@@ -9,6 +9,7 @@ try {
     $event_id    = $_POST['event_id'] ?? null;
     $user_id     = $_POST['user_id'] ?? null;
     $attendee_id = $_POST['attendee_id'] ?? null;
+    $app_user_id = $_POST['app_user_id'] ?? null;  // NEW
     $date        = $_POST['date'] ?? date('Y-m-d');
     $time        = $_POST['time'] ?? date('H:i:s');
     $status      = $_POST['status'] ?? 1;
@@ -16,10 +17,12 @@ try {
     $print_type  = $_POST['print_type'] ?? null;
     $scan_for    = $_POST['scan_for'] ?? 'kit'; 
 
-    if (!$event_id || !$user_id || !$attendee_id) {
-        throw new Exception("Missing required fields: event_id, user_id, or attendee_id");
+    // Validate required fields including app_user_id
+    if (!$event_id || !$user_id || !$attendee_id || !$app_user_id) {
+        throw new Exception("Missing required fields: event_id, user_id, attendee_id, or app_user_id");
     }
 
+    // Get event short_name
     $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
     $stmt->bind_param("i", $event_id);
     $stmt->execute();
@@ -29,16 +32,18 @@ try {
     $shortName = strtolower($event['short_name']);
     $stmt->close();
 
+    // Connect to event database
     $eventResult = connectEventDb($event_id);
     if (!$eventResult['success']) throw new Exception($eventResult['message']);
     $eventConn = $eventResult['conn'];
 
+    // Check if already scanned (including app_user_id)
     $checkStmt = $eventConn->prepare("
         SELECT id FROM event_scan_logg 
-        WHERE event_id = ? AND user_id = ? AND attendee_id = ? AND is_delete = 0 AND scan_for = ?
+        WHERE event_id = ? AND user_id = ? AND attendee_id = ? AND app_user_id = ? AND is_delete = 0 AND scan_for = ?
         LIMIT 1
     ");
-    $checkStmt->bind_param("iiis", $event_id, $user_id, $attendee_id, $scan_for);
+    $checkStmt->bind_param("iiiis", $event_id, $user_id, $attendee_id, $app_user_id, $scan_for);
     $checkStmt->execute();
     $checkResult = $checkStmt->get_result();
     $alreadyScanned = $checkResult->fetch_assoc();
@@ -57,16 +62,18 @@ try {
         $print_type = 'Issued';
     }
 
+    // Insert scan log with app_user_id
     $insertStmt = $eventConn->prepare("
         INSERT INTO event_scan_logg (
-            event_id, user_id, attendee_id, date, time, print_type, status, is_delete, scan_for, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            event_id, user_id, attendee_id, app_user_id, date, time, print_type, status, is_delete, scan_for, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     ");
     $insertStmt->bind_param(
-        "iiisssiss",
+        "iiiisssiss",
         $event_id,
         $user_id,
         $attendee_id,
+        $app_user_id,
         $date,
         $time,
         $print_type,
