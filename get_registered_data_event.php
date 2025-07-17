@@ -1,22 +1,11 @@
 <?php
 header('Content-Type: application/json');
 
-// Database credentials
-$mainDb = "prop_propass";
-$servername = "localhost";
-$username = "root";
-$password = "";
+require_once 'config.php';
+require_once 'connect_event_database.php';
 
-// Connect to main DB
-$conn = new mysqli($servername, $username, $password, $mainDb);
-if ($conn->connect_error) {
-    die(json_encode(['success' => false, 'message' => 'Main DB connection failed']));
-}
-
-// Read JSON input
-$rawInput = file_get_contents("php://input");
-$input = json_decode($rawInput, true);
-
+// Get input
+$input = json_decode(file_get_contents("php://input"), true);
 $event_id = isset($input['event_id']) ? intval($input['event_id']) : 0;
 $page = isset($input['page']) ? max(1, intval($input['page'])) : 1;
 $page_size = isset($input['page_size']) ? intval($input['page_size']) : 20;
@@ -26,62 +15,37 @@ if (!$event_id) {
     exit();
 }
 
-// Calculate offset
+// Connect to event DB
+$connectionResult = connectEventDb($event_id);
+if (!$connectionResult['success']) {
+    echo json_encode($connectionResult);
+    exit();
+}
+
+$eventConn = $connectionResult['conn'];
+$eventDb = $connectionResult['db_name'];
+
+// Pagination offset
 $offset = ($page - 1) * $page_size;
 
-// Get event short_name to form event DB name
-$eventQuery = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
-$eventQuery->bind_param("i", $event_id);
-$eventQuery->execute();
-$eventResult = $eventQuery->get_result();
-
-if ($eventResult->num_rows === 0) {
-    echo json_encode(['success' => false, 'message' => 'Event not found']);
-    exit();
-}
-
-$event = $eventResult->fetch_assoc();
-$shortName = $event['short_name'];
-$eventDb = $mainDb . "_event_" . $shortName;
-
-// Connect to event-specific DB
-$eventConn = new mysqli($servername, $username, $password, $eventDb);
-if ($eventConn->connect_error) {
-    echo json_encode(['success' => false, 'message' => "Failed to connect to event DB: $eventDb"]);
-    exit();
-}
-
-// Get total count of registrations
-$countQuery = "
-    SELECT COUNT(*) as total_count
-    FROM {$eventDb}.event_registrations er
-    WHERE er.is_deleted = 0 AND er.event_id = ?
-";
+// Get total count
+$countQuery = "SELECT COUNT(*) as total_count FROM {$eventDb}.event_registrations WHERE is_deleted = 0 AND event_id = ?";
 $countStmt = $eventConn->prepare($countQuery);
 $countStmt->bind_param("i", $event_id);
 $countStmt->execute();
 $countResult = $countStmt->get_result();
-
-$totalCount = 0;
-if ($countRow = $countResult->fetch_assoc()) {
-    $totalCount = intval($countRow['total_count']);
-}
+$totalCount = $countResult->fetch_assoc()['total_count'] ?? 0;
 $countStmt->close();
 
+// If no data, return early
 if ($totalCount === 0) {
-    echo json_encode([
-        'success' => true,
-        'total_count' => 0,
-        'data' => []
-    ]);
-    $conn->close();
+    echo json_encode(['success' => true, 'total_count' => 0, 'data' => []]);
     $eventConn->close();
     exit();
 }
 
-// Prepare query to fetch registrations joined with attendees and categories
+// Main query
 $limitClause = ($page_size === 0) ? "" : "LIMIT ? OFFSET ?";
-
 $query = "
     SELECT 
         er.*, 
@@ -98,33 +62,31 @@ $query = "
     $limitClause
 ";
 
-$stmt = $eventConn->prepare($query);
+$stmt = ($page_size === 0)
+    ? $eventConn->prepare($query)
+    : $eventConn->prepare($query);
 
 if ($page_size === 0) {
-    // Fetch all records, no limit
     $stmt->bind_param("i", $event_id);
 } else {
-    // Fetch paginated records
     $stmt->bind_param("iii", $event_id, $page_size, $offset);
 }
 
 $stmt->execute();
 $result = $stmt->get_result();
 
-$registrations = [];
+$data = [];
 while ($row = $result->fetch_assoc()) {
-    $registrations[] = $row;
+    $data[] = $row;
 }
 
 $stmt->close();
-$conn->close();
 $eventConn->close();
 
-// Output response
 echo json_encode([
     'success' => true,
     'total_count' => $totalCount,
     'page' => $page,
     'page_size' => $page_size,
-    'data' => $registrations
+    'data' => $data
 ]);

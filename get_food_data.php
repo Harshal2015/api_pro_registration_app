@@ -1,8 +1,8 @@
 <?php
 $mainHost = 'localhost';
 $mainDb   = 'prop_propass';
-$user     = 'root'; // Replace with your actual database username
-$pass     = '';     // Replace with your actual database password
+$user     = 'root'; 
+$pass     = '';    
 $charset  = 'utf8mb4';
 
 $mainDsn = "mysql:host=$mainHost;dbname=$mainDb;charset=$charset";
@@ -44,7 +44,7 @@ try {
     $scans = $scanStmt->fetchAll();
 
     $scanMap = [];
-    $masterCount = ['lunch' => 0, 'dinner' => 0]; // Only lunch and dinner master counts
+    $masterCount = ['lunch' => 0, 'dinner' => 0]; 
     $totals = [
         'lunch_taken' => 0,
         'dinner_taken' => 0,
@@ -58,15 +58,15 @@ try {
         $ptype = strtolower(trim($s['print_type']));
         $meal = strtolower(trim($s['scan_for']));
 
-        if (!in_array($meal, ['lunch', 'dinner'])) continue; // Ensure only lunch/dinner are processed
+        if (!in_array($meal, ['lunch', 'dinner'])) continue; 
 
-        if ($ptype === 'master') {
+        if ($ptype === 'master qr') {
             $masterCount[$meal]++;
             continue;
         }
 
         if (!isset($scanMap[$key])) {
-            $scanMap[$key] = ['lunch' => [], 'dinner' => []]; // Initialize only for lunch/dinner
+            $scanMap[$key] = ['lunch' => [], 'dinner' => []]; 
         }
 
         $scanMap[$key][$meal][] = [
@@ -115,7 +115,7 @@ try {
             $attendeeName = $shortName !== '' ? trim("$prefix $shortName") : $fullName;
         }
 
-        foreach (['lunch', 'dinner'] as $meal) { // Iterate only for lunch and dinner
+        foreach (['lunch', 'dinner'] as $meal) { 
             $entries = $scanMap[$key][$meal] ?? [];
 
             if (empty($entries)) {
@@ -133,7 +133,7 @@ try {
 
             $hasAutoTaken = false;
             foreach ($entries as $entry) {
-                if ($entry['type'] === 'auto') {
+                if ($entry['type'] === 'issued') {
                     if (!$hasAutoTaken) {
                         $totals[$meal . '_taken']++;
                         $report[] = [
@@ -142,12 +142,12 @@ try {
                             'attendee_name' => $attendeeName,
                             'category_name' => $reg['category_name'] ?? 'Unknown Category',
                             'meal'        => ucfirst($meal),
-                            'status'      => 'Meal Taken (Auto)',
+                            'status'      => 'Meal Taken (Issued)',
                             'taken_at'    => $entry['date_time'],
                         ];
                         $hasAutoTaken = true;
                     }
-                } elseif ($entry['type'] === 'manual') {
+                } elseif ($entry['type'] === 'reissued') {
                     $totals[$meal . '_retaken']++;
                     $report[] = [
                         'user_id'     => $reg['user_id'],
@@ -155,7 +155,7 @@ try {
                         'attendee_name' => $attendeeName,
                         'category_name' => $reg['category_name'] ?? 'Unknown Category',
                         'meal'        => ucfirst($meal),
-                        'status'      => 'Meal Re-Taken (Manual)',
+                        'status'      => 'Meal Re-Taken (Reissued)',
                         'taken_at'    => $entry['date_time'],
                     ];
                 }

@@ -1,6 +1,5 @@
 <?php
-// Set timezone to ensure correct current date/time if not provided
-date_default_timezone_set('Asia/Kolkata');  // Change as needed
+date_default_timezone_set('Asia/Kolkata'); 
 
 $mainHost = 'localhost';
 $mainDb   = 'prop_propass';
@@ -22,7 +21,6 @@ try {
     $attendee_id = $_POST['attendee_id'] ?? null;
     $app_user_id = $_POST['app_user_id'] ?? null;
 
-    // If date/time are not posted, use current server date/time
     $date = $_POST['date'] ?? date('Y-m-d');
     $time = $_POST['time'] ?? date('H:i:s');
 
@@ -68,7 +66,7 @@ try {
 
     $alreadyScanned = $checkStmt->fetch();
 
-    if ($alreadyScanned && $print_type !== 'Manual') {
+    if ($alreadyScanned && $print_type !== 'Reissued') {
         echo json_encode([
             'success' => false,
             'require_permission' => true,
@@ -78,7 +76,7 @@ try {
     }
 
     if (!$print_type) {
-        $print_type = 'Auto';
+        $print_type = 'Issued';
     }
 
     // Insert scan record

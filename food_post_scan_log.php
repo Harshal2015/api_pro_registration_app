@@ -1,6 +1,5 @@
 <?php
-// Set your timezone here to get correct current date/time
-date_default_timezone_set('Asia/Kolkata');  // Change this to your timezone
+date_default_timezone_set('Asia/Kolkata');  
 
 $mainHost = 'localhost';
 $mainDb   = 'prop_propass';
@@ -21,7 +20,6 @@ try {
     $user_id     = $_POST['user_id'] ?? null;
     $attendee_id = $_POST['attendee_id'] ?? null;
 
-    // Get current server date and time as strings for varchar columns
     $date = date('Y-m-d');
     $time = date('H:i:s');
 
@@ -29,14 +27,13 @@ try {
     $is_delete   = $_POST['is_delete'] ?? 0;
     $print_type  = $_POST['print_type'] ?? null;
 
-    if (!$event_id || (!$user_id && $print_type !== 'Master') || (!$attendee_id && $print_type !== 'Master')) {
+    if (!$event_id || (!$user_id && $print_type !== 'Master QR') || (!$attendee_id && $print_type !== 'Master QR')) {
         throw new Exception("Missing required fields: event_id" .
-            (($print_type !== 'Master' && !$user_id) ? ", user_id" : "") .
-            (($print_type !== 'Master' && !$attendee_id) ? ", attendee_id" : "")
+            (($print_type !== 'Master QR' && !$user_id) ? ", user_id" : "") .
+            (($print_type !== 'Master QR' && !$attendee_id) ? ", attendee_id" : "")
         );
     }
 
-    // Determine scan_for based on current server time
     $scanTimestamp = strtotime($time);
     $lunchStart    = strtotime('11:00:00');
     $lunchEnd      = strtotime('15:59:59');
@@ -53,10 +50,9 @@ try {
     ) {
         $scan_for = 'Dinner';
     } else {
-        $scan_for = 'Lunch'; // fallback
+        $scan_for = 'Lunch';
     }
 
-    // Get short_name from main DB
     $stmt = $mainPdo->prepare("SELECT short_name FROM events WHERE id = :event_id LIMIT 1");
     $stmt->execute([':event_id' => $event_id]);
     $event = $stmt->fetch();
@@ -70,8 +66,7 @@ try {
     $eventDsn  = "mysql:host=$mainHost;dbname=$eventDb;charset=$charset";
     $eventPdo  = new PDO($eventDsn, $user, $pass, $options);
 
-    // Prevent duplicate scan unless Manual or Master
-    if ($print_type !== 'Master') {
+    if ($print_type !== 'Master QR') {
         $checkStmt = $eventPdo->prepare("
             SELECT id FROM event_scan_logs_food 
             WHERE event_id = :event_id
@@ -92,7 +87,7 @@ try {
 
         $alreadyScanned = $checkStmt->fetch();
 
-        if ($alreadyScanned && $print_type !== 'Manual') {
+        if ($alreadyScanned && $print_type !== 'Reissued') {
             echo json_encode([
                 'success' => false,
                 'require_permission' => true,
@@ -104,10 +99,9 @@ try {
     }
 
     if (!$print_type) {
-        $print_type = 'Auto';
+        $print_type = 'Issued';
     }
 
-    // Insert with current date/time values into varchar columns, timestamps with NOW()
     $insert = $eventPdo->prepare("
         INSERT INTO event_scan_logs_food (
             event_id, user_id, attendee_id, date, time, print_type, status, is_delete, scan_for, created_at, updated_at

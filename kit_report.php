@@ -50,15 +50,15 @@ try {
         $ptype = strtolower($s['print_type']);
 
         if (!isset($scanMap[$key])) {
-            $scanMap[$key] = ['auto' => null, 'manual' => []];
+            $scanMap[$key] = ['issued' => null, 'reissued' => []];
         }
-        if ($ptype === 'auto') {
-            if ($scanMap[$key]['auto'] === null || $dt < $scanMap[$key]['auto']['date_time']) {
-                $scanMap[$key]['auto'] = ['status' => 'Kit Collected (Auto)', 'date_time' => $dt];
+        if ($ptype === 'issued') {
+            if ($scanMap[$key]['issued'] === null || $dt < $scanMap[$key]['issued']['date_time']) {
+                $scanMap[$key]['issued'] = ['status' => 'Kit Collected (Issued)', 'date_time' => $dt];
             }
         }
-        if ($ptype === 'manual') {
-            $scanMap[$key]['manual'][] = ['status' => 'Kit Reissued (Manual)', 'date_time' => $dt];
+        if ($ptype === 'reissued') {
+            $scanMap[$key]['reissued'][] = ['status' => 'Kit Reissued (Reissued)', 'date_time' => $dt];
         }
     }
 
@@ -106,15 +106,15 @@ try {
         }
 
         // Safely get scan entries
-        $entrySet = $scanMap[$key] ?? ['auto' => null, 'manual' => []];
+        $entrySet = $scanMap[$key] ?? ['issued' => null, 'reissued' => []];
         $entries = [];
 
-        if (!empty($entrySet['auto'])) {
-            $entries[] = $entrySet['auto'];
+        if (!empty($entrySet['issued'])) {
+            $entries[] = $entrySet['issued'];
         }
 
-        if (!empty($entrySet['manual']) && is_array($entrySet['manual'])) {
-            foreach ($entrySet['manual'] as $manualEntry) {
+        if (!empty($entrySet['reissued']) && is_array($entrySet['reissued'])) {
+            foreach ($entrySet['reissued'] as $manualEntry) {
                 $entries[] = $manualEntry;
             }
         }

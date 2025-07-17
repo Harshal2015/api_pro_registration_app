@@ -58,25 +58,25 @@ try {
 
         if (!isset($scanMap[$key])) {
             $scanMap[$key] = [
-                'auto' => null,
-                'manual' => [],
+                'issued' => null,
+                'reissued' => [],
             ];
         }
 
         // Keep earliest auto scan only
-        if ($ptype === 'auto') {
-            if ($scanMap[$key]['auto'] === null || $dt < $scanMap[$key]['auto']['date_time']) {
-                $scanMap[$key]['auto'] = [
-                    'status' => 'Collected (Auto)',
+        if ($ptype === 'issued') {
+            if ($scanMap[$key]['issued'] === null || $dt < $scanMap[$key]['issued']['date_time']) {
+                $scanMap[$key]['issued'] = [
+                    'status' => 'Collected',
                     'date_time' => $dt,
                 ];
             }
         }
 
         // Keep all manual scans
-        if ($ptype === 'manual') {
-            $scanMap[$key]['manual'][] = [
-                'status' => 'Reissued (Manual)',
+        if ($ptype === 'reissued') {
+            $scanMap[$key]['reissued'][] = [
+                'status' => 'Reissued',
                 'date_time' => $dt,
             ];
         }
@@ -138,13 +138,13 @@ try {
         $statusEntries = [];
 
         // Add earliest auto collected scan if exists
-        if (isset($scanMap[$key]['auto']) && $scanMap[$key]['auto'] !== null) {
-            $statusEntries[] = $scanMap[$key]['auto'];
+        if (isset($scanMap[$key]['issued']) && $scanMap[$key]['issued'] !== null) {
+            $statusEntries[] = $scanMap[$key]['issued'];
         }
 
         // Add all manual reissued scans
-        if (isset($scanMap[$key]['manual']) && count($scanMap[$key]['manual']) > 0) {
-            foreach ($scanMap[$key]['manual'] as $manualEntry) {
+        if (isset($scanMap[$key]['reissued']) && count($scanMap[$key]['reissued']) > 0) {
+            foreach ($scanMap[$key]['reissued'] as $manualEntry) {
                 $statusEntries[] = $manualEntry;
             }
         }
@@ -185,7 +185,7 @@ try {
             $collectedUserAttendee[$key] = true;
         }
 
-        if ($row['status'] === 'Reissued (Manual)') {
+        if ($row['status'] === 'Reissued') {
             $totalReissued++;
         }
     }

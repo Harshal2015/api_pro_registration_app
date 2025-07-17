@@ -61,7 +61,7 @@ try {
 
     $alreadyScanned = $checkStmt->fetch();
 
-    if ($alreadyScanned && $print_type !== 'Manual') {
+    if ($alreadyScanned && $print_type !== 'Reissued') {
         echo json_encode([
             'success' => false,
             'require_permission' => true,
@@ -71,7 +71,7 @@ try {
     }
 
     if (!$print_type) {
-        $print_type = 'Auto';
+        $print_type = 'Issued';
     }
 
     $insert = $eventPdo->prepare("
