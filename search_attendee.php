@@ -100,7 +100,9 @@ foreach ($eventDbs as $eventDbName) {
 
     $sqlCheck = "
         SELECT 
-            er.user_id, ec.name AS category_name
+            er.id AS event_registration_id,
+            er.user_id,
+            ec.name AS category_name
         FROM event_registrations er
         LEFT JOIN event_categories ec ON er.category_id = ec.id
         WHERE er.user_id IN ($in) AND er.is_deleted = 0
@@ -114,6 +116,7 @@ foreach ($eventDbs as $eventDbName) {
             $registrationsMap[$userId][] = [
                 'event' => $shortName,
                 'category_name' => $row['category_name'] ?? 'General',
+                'event_registration_id' => $row['event_registration_id'] ?? null
             ];
         }
     }
@@ -127,11 +130,9 @@ foreach ($attendees as &$attendee) {
 
     if (!empty($attendee['registered_events'])) {
         $attendee['category_name'] = $attendee['registered_events'][0]['category_name'] ?? 'General';
+        $attendee['event_registration_id'] = $attendee['registered_events'][0]['event_registration_id'] ?? null;
     }
 
-    // Show attendee only if:
-    // - all attendees requested (onlyEventRegistrations = false)
-    // - OR attendee has registrations (onlyEventRegistrations = true)
     if (!$onlyEventRegistrations || !empty($attendee['registered_events'])) {
         $filteredAttendees[] = $attendee;
     }

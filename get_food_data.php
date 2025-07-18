@@ -27,7 +27,7 @@ try {
     $scanStmt = $eventConn->prepare("
         SELECT user_id, attendee_id, print_type, scan_for, date, time
         FROM event_scan_logs_food
-        WHERE event_id = ? AND scan_for IN ('lunch', 'dinner') AND is_delete = 0
+        WHERE event_id = ? AND scan_for IN ('lunch', 'dinner') AND is_deleted = 0
         ORDER BY date ASC, time ASC
     ");
     $scanStmt->bind_param("i", $event_id);
