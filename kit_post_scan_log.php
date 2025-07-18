@@ -13,7 +13,7 @@ try {
     $date        = $_POST['date'] ?? date('Y-m-d');
     $time        = $_POST['time'] ?? date('H:i:s');
     $status      = $_POST['status'] ?? 1;
-    $is_delete   = $_POST['is_delete'] ?? 0;
+    $is_deleted   = $_POST['is_deleted'] ?? 0;
     $print_type  = $_POST['print_type'] ?? null;
     $scan_for    = $_POST['scan_for'] ?? 'kit'; 
 
@@ -40,7 +40,7 @@ try {
     // Check if already scanned (including app_user_id)
     $checkStmt = $eventConn->prepare("
         SELECT id FROM event_scan_logg 
-        WHERE event_id = ? AND user_id = ? AND attendee_id = ? AND app_user_id = ? AND is_delete = 0 AND scan_for = ?
+        WHERE event_id = ? AND user_id = ? AND attendee_id = ? AND app_user_id = ? AND is_deleted = 0 AND scan_for = ?
         LIMIT 1
     ");
     $checkStmt->bind_param("iiiis", $event_id, $user_id, $attendee_id, $app_user_id, $scan_for);
@@ -65,7 +65,7 @@ try {
     // Insert scan log with app_user_id
     $insertStmt = $eventConn->prepare("
         INSERT INTO event_scan_logg (
-            event_id, user_id, attendee_id, app_user_id, date, time, print_type, status, is_delete, scan_for, created_at, updated_at
+            event_id, user_id, attendee_id, app_user_id, date, time, print_type, status, is_deleted, scan_for, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     ");
     $insertStmt->bind_param(
@@ -78,7 +78,7 @@ try {
         $time,
         $print_type,
         $status,
-        $is_delete,
+        $is_deleted,
         $scan_for
     );
     $insertStmt->execute();

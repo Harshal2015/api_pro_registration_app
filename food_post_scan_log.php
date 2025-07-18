@@ -12,7 +12,7 @@ try {
     $attendee_id = $_POST['attendee_id'] ?? null;
     $print_type  = $_POST['print_type'] ?? null;
     $status      = $_POST['status'] ?? 1;
-    $is_delete   = $_POST['is_delete'] ?? 0;
+    $is_deleted   = $_POST['is_deleted'] ?? 0;
 
     if (!$event_id || (!$user_id && $print_type !== 'Master QR') || (!$attendee_id && $print_type !== 'Master QR')) {
         throw new Exception("Missing required fields: event_id" .
@@ -66,7 +66,7 @@ try {
               AND attendee_id = ?
               AND date = ?
               AND scan_for = ?
-              AND is_delete = 0
+              AND is_deleted = 0
             LIMIT 1
         ");
         $checkStmt->bind_param("iiiss", $event_id, $user_id, $attendee_id, $date, $scan_for);
@@ -91,7 +91,7 @@ try {
 
     $insertStmt = $eventConn->prepare("
         INSERT INTO event_scan_logs_food (
-            event_id, user_id, attendee_id, date, time, print_type, status, is_delete, scan_for, created_at, updated_at
+            event_id, user_id, attendee_id, date, time, print_type, status, is_deleted, scan_for, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     ");
     $insertStmt->bind_param(
@@ -103,7 +103,7 @@ try {
         $time,
         $print_type,
         $status,
-        $is_delete,
+        $is_deleted,
         $scan_for
     );
     $insertStmt->execute();

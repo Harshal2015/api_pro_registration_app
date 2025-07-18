@@ -10,9 +10,10 @@ $input = json_decode(file_get_contents('php://input'), true);
 $name = trim($input['name'] ?? '');
 $email = trim($input['email'] ?? '');
 $phone = trim($input['phone'] ?? '');
+$onlyEventRegistrations = $input['only_event_registrations'] ?? false;
 
-if (!$email && !$phone) {
-    echo json_encode(['success' => false, 'message' => 'Provide email or phone']);
+if (!$email && !$phone && !$name) {
+    echo json_encode(['success' => false, 'message' => 'Provide name, email, or phone']);
     exit;
 }
 
@@ -96,20 +97,44 @@ foreach ($eventDbs as $eventDbName) {
     if (!$eventConnResult['success']) continue;
 
     $eventConn = $eventConnResult['conn'];
-    $sqlCheck = "SELECT user_id FROM event_registrations WHERE user_id IN ($in) AND is_deleted = 0";
+
+    $sqlCheck = "
+        SELECT 
+            er.user_id, ec.name AS category_name
+        FROM event_registrations er
+        LEFT JOIN event_categories ec ON er.category_id = ec.id
+        WHERE er.user_id IN ($in) AND er.is_deleted = 0
+    ";
+
     $result = $eventConn->query($sqlCheck);
 
     if ($result && $result->num_rows > 0) {
         while ($row = $result->fetch_assoc()) {
-            $registrationsMap[$row['user_id']][] = $shortName;
+            $userId = $row['user_id'];
+            $registrationsMap[$userId][] = [
+                'event' => $shortName,
+                'category_name' => $row['category_name'] ?? 'General',
+            ];
         }
     }
 
     $eventConn->close();
 }
 
+$filteredAttendees = [];
 foreach ($attendees as &$attendee) {
     $attendee['registered_events'] = $registrationsMap[$attendee['id']] ?? [];
+
+    if (!empty($attendee['registered_events'])) {
+        $attendee['category_name'] = $attendee['registered_events'][0]['category_name'] ?? 'General';
+    }
+
+    // Show attendee only if:
+    // - all attendees requested (onlyEventRegistrations = false)
+    // - OR attendee has registrations (onlyEventRegistrations = true)
+    if (!$onlyEventRegistrations || !empty($attendee['registered_events'])) {
+        $filteredAttendees[] = $attendee;
+    }
 }
 
-echo json_encode(['success' => true, 'attendees' => $attendees]);
+echo json_encode(['success' => true, 'attendees' => $filteredAttendees]);
