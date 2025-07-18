@@ -6,24 +6,26 @@ require_once 'config.php';
 require_once 'connect_event_database.php';
 
 try {
+    // Step 1: Collect Input
     $event_id    = $_POST['event_id'] ?? null;
     $user_id     = $_POST['user_id'] ?? null;
     $attendee_id = $_POST['attendee_id'] ?? null;
-    $app_user_id = $_POST['app_user_id'] ?? null;  // NEW
+    $app_user_id = $_POST['app_user_id'] ?? null;
+    $print_type  = $_POST['print_type'] ?? null;
+    $status      = $_POST['status'] ?? 1;
+    $is_deleted  = $_POST['is_deleted'] ?? 0;
     $date        = $_POST['date'] ?? date('Y-m-d');
     $time        = $_POST['time'] ?? date('H:i:s');
-    $status      = $_POST['status'] ?? 1;
-    $is_deleted   = $_POST['is_deleted'] ?? 0;
-    $print_type  = $_POST['print_type'] ?? null;
-    $scan_for    = $_POST['scan_for'] ?? 'kit'; 
+    $scan_for    = $_POST['scan_for'] ?? 'kit';
 
-    // Validate required fields including app_user_id
+    // Step 2: Validate required inputs
     if (!$event_id || !$user_id || !$attendee_id || !$app_user_id) {
         throw new Exception("Missing required fields: event_id, user_id, attendee_id, or app_user_id");
     }
 
-    // Get event short_name
-    $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
+    // Step 3: Get event short name
+    $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ? LIMIT 1");
+    if (!$stmt) throw new Exception("Prepare failed: " . $conn->error);
     $stmt->bind_param("i", $event_id);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -32,42 +34,76 @@ try {
     $shortName = strtolower($event['short_name']);
     $stmt->close();
 
-    // Connect to event database
+    // Step 4: Connect to event-specific DB
     $eventResult = connectEventDb($event_id);
     if (!$eventResult['success']) throw new Exception($eventResult['message']);
     $eventConn = $eventResult['conn'];
 
-    // Check if already scanned (including app_user_id)
-    $checkStmt = $eventConn->prepare("
-        SELECT id FROM event_scan_logg 
-        WHERE event_id = ? AND user_id = ? AND attendee_id = ? AND app_user_id = ? AND is_deleted = 0 AND scan_for = ?
-        LIMIT 1
-    ");
-    $checkStmt->bind_param("iiiis", $event_id, $user_id, $attendee_id, $app_user_id, $scan_for);
-    $checkStmt->execute();
-    $checkResult = $checkStmt->get_result();
-    $alreadyScanned = $checkResult->fetch_assoc();
-    $checkStmt->close();
+    // Step 5: Fetch category_id of the attendee
+    $regStmt = $eventConn->prepare("SELECT category_id FROM event_registrations WHERE id = ? LIMIT 1");
+    if (!$regStmt) throw new Exception("Prepare failed (Registration fetch): " . $eventConn->error);
+    $regStmt->bind_param("i", $attendee_id);
+    $regStmt->execute();
+    $regResult = $regStmt->get_result();
+    if ($regResult->num_rows === 0) throw new Exception("Attendee not found in event_registrations.");
+    $regRow = $regResult->fetch_assoc();
+    $regStmt->close();
 
-    if ($alreadyScanned && strtolower($print_type) !== 'reissued') {
+    $category_id = $regRow['category_id'];
+
+    // Step 6: Check if category has kit access
+    $catStmt = $eventConn->prepare("SELECT name, is_kit FROM event_categories WHERE id = ? LIMIT 1");
+    if (!$catStmt) throw new Exception("Prepare failed (Category fetch): " . $eventConn->error);
+    $catStmt->bind_param("i", $category_id);
+    $catStmt->execute();
+    $catResult = $catStmt->get_result();
+    if ($catResult->num_rows === 0) throw new Exception("Category not found in event_categories.");
+    $categoryInfo = $catResult->fetch_assoc();
+    $catStmt->close();
+
+    if (intval($categoryInfo['is_kit']) !== 1) {
         echo json_encode([
             'success' => false,
-            'require_permission' => true,
-            'message' => "Already scanned $scan_for before. Allow manual override?",
+            'message' => 'No access for Kit based on category.',
         ]);
         exit;
     }
 
-    if (!$print_type) {
-        $print_type = 'Issued';
+    // Step 7: Check for duplicate scan (unless Reissued)
+    $checkStmt = $eventConn->prepare("
+        SELECT id FROM event_scan_logg 
+        WHERE event_id = ? AND user_id = ? AND attendee_id = ? 
+          AND app_user_id = ? AND is_deleted = 0 AND scan_for = ?
+        LIMIT 1
+    ");
+    if (!$checkStmt) throw new Exception("Prepare failed (Duplicate check): " . $eventConn->error);
+    $checkStmt->bind_param("iiiis", $event_id, $user_id, $attendee_id, $app_user_id, $scan_for);
+    $checkStmt->execute();
+    $checkResult = $checkStmt->get_result();
+    $alreadyScanned = $checkResult->num_rows > 0;
+    $checkStmt->close();
+
+    if ($alreadyScanned && strtolower($print_type) !== 'reissued') {
+        echo json_encode([
+            'success'             => false,
+            'require_permission'  => true,
+            'message'             => "Already scanned $scan_for. Allow manual override?",
+        ]);
+        exit;
     }
 
-    // Insert scan log with app_user_id
+    if (!$print_type) $print_type = 'Issued';
+
+    // Step 8: Insert scan log
     $insertStmt = $eventConn->prepare("
         INSERT INTO event_scan_logg (
-            event_id, user_id, attendee_id, app_user_id, date, time, print_type, status, is_deleted, scan_for, created_at, updated_at
+            event_id, user_id, attendee_id, app_user_id,
+            date, time, print_type, status, is_deleted, scan_for,
+            created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     ");
+    if (!$insertStmt) throw new Exception("Prepare failed (Insert): " . $eventConn->error);
+
     $insertStmt->bind_param(
         "iiiisssiss",
         $event_id,
