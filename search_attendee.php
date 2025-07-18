@@ -2,10 +2,9 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
-require_once 'config.php';
+require_once 'config.php';  // uses $conn
 require_once 'connect_event_database.php';
 require_once 'tables.php';
-
 
 $input = json_decode(file_get_contents('php://input'), true);
 $name = trim($input['name'] ?? '');
@@ -17,33 +16,34 @@ if (!$email && !$phone) {
     exit;
 }
 
-try {
-    $pdoMain = new PDO("mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4", DB_USER, DB_PASSWORD, [
-        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-    ]);
-} catch (PDOException $e) {
-    echo json_encode(['success' => false, 'message' => 'Main DB connection failed: ' . $e->getMessage()]);
-    exit;
-}
-
 $where = [];
 $params = [];
+$types = '';
 
 function esc($str) {
     return str_replace(['%', '_'], ['\%', '\_'], $str);
 }
 
 if ($name) {
-    $where[] = "(first_name LIKE :name OR secondary_email LIKE :name)";
-    $params[':name'] = '%' . esc($name) . '%';
+    $where[] = "(first_name LIKE ? OR secondary_email LIKE ?)";
+    $likeName = '%' . esc($name) . '%';
+    $params[] = $likeName;
+    $params[] = $likeName;
+    $types .= 'ss';
 }
 if ($email) {
-    $where[] = "(primary_email_address LIKE :email OR secondary_email LIKE :email)";
-    $params[':email'] = '%' . esc($email) . '%';
+    $where[] = "(primary_email_address LIKE ? OR secondary_email LIKE ?)";
+    $likeEmail = '%' . esc($email) . '%';
+    $params[] = $likeEmail;
+    $params[] = $likeEmail;
+    $types .= 'ss';
 }
 if ($phone) {
-    $where[] = "(primary_phone_number LIKE :phone OR secondary_mobile_number LIKE :phone)";
-    $params[':phone'] = '%' . esc($phone) . '%';
+    $where[] = "(primary_phone_number LIKE ? OR secondary_mobile_number LIKE ?)";
+    $likePhone = '%' . esc($phone) . '%';
+    $params[] = $likePhone;
+    $params[] = $likePhone;
+    $types .= 'ss';
 }
 
 $whereSql = count($where) > 0 ? '(' . implode(' OR ', $where) . ") AND is_deleted = 0" : 'is_deleted = 0';
@@ -61,20 +61,30 @@ FROM " . TABLE_ATTENDEES . "
 WHERE $whereSql
 LIMIT 50";
 
-$stmt = $pdoMain->prepare($sql);
-$stmt->execute($params);
-$attendees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+$stmt = $conn->prepare($sql);
+if ($types) {
+    $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$result = $stmt->get_result();
+$attendees = $result->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
 
 if (!$attendees) {
     echo json_encode(['success' => true, 'attendees' => []]);
     exit;
 }
 
-$eventDbs = $pdoMain->query("SHOW DATABASES LIKE 'prop_propass_event_%'")->fetchAll(PDO::FETCH_COLUMN);
-$registrationsMap = [];
+$eventDbsResult = $conn->query("SHOW DATABASES LIKE 'prop_propass_event_%'");
+$eventDbs = [];
+while ($row = $eventDbsResult->fetch_row()) {
+    $eventDbs[] = $row[0];
+}
 
+$registrationsMap = [];
 $ids = array_column($attendees, 'id');
 $in = implode(',', array_map('intval', $ids));
+
 if (!$in) {
     echo json_encode(['success' => true, 'attendees' => $attendees]);
     exit;
@@ -86,7 +96,6 @@ foreach ($eventDbs as $eventDbName) {
     if (!$eventConnResult['success']) continue;
 
     $eventConn = $eventConnResult['conn'];
-
     $sqlCheck = "SELECT user_id FROM event_registrations WHERE user_id IN ($in) AND is_deleted = 0";
     $result = $eventConn->query($sqlCheck);
 
