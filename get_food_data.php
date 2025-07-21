@@ -6,7 +6,6 @@ require_once 'config.php';
 require_once 'connect_event_database.php'; 
 require_once 'tables.php';
 
-
 try {
     $event_id = $_GET['event_id'] ?? $_POST['event_id'] ?? null;
     if (!$event_id) throw new Exception('Missing event_id');
@@ -41,6 +40,8 @@ try {
 
     $scanMap = [];
     $masterCount = ['lunch' => 0, 'dinner' => 0];
+    $masterQrDaily = []; // NEW: date-wise master QR counts
+
     $totals = [
         'lunch_taken' => 0,
         'dinner_taken' => 0,
@@ -50,7 +51,7 @@ try {
 
     foreach ($scans as $s) {
         $key = $s['user_id'] . ':' . $s['attendee_id'];
-        $dt = $s['date'] . ' ' . $s['time'];
+        $dt = $s['date'];  // Only date part for daily counts
         $ptype = strtolower(trim($s['print_type']));
         $meal = strtolower(trim($s['scan_for']));
 
@@ -58,6 +59,11 @@ try {
 
         if ($ptype === 'master qr') {
             $masterCount[$meal]++;
+            // Track date-wise master QR count
+            if (!isset($masterQrDaily[$dt])) {
+                $masterQrDaily[$dt] = ['lunch' => 0, 'dinner' => 0];
+            }
+            $masterQrDaily[$dt][$meal]++;
             continue;
         }
 
@@ -66,7 +72,7 @@ try {
         }
         $scanMap[$key][$meal][] = [
             'type' => $ptype,
-            'date_time' => $dt,
+            'date_time' => $s['date'] . ' ' . $s['time'],
         ];
     }
 
@@ -181,6 +187,7 @@ try {
         'total_dinner'     => $totals['dinner_taken'] + $totals['dinner_retaken'] + $masterCount['dinner'],
         'master_qr_lunch'  => $masterCount['lunch'],
         'master_qr_dinner' => $masterCount['dinner'],
+        'master_qr_daily'    => $masterQrDaily,  // date-wise master QR counts added here
         'lunch_retaken'    => $totals['lunch_retaken'],
         'dinner_retaken'   => $totals['dinner_retaken'],
         'lunch_taken'      => $totals['lunch_taken'],
