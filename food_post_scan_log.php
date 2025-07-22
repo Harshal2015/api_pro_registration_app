@@ -1,18 +1,20 @@
 <?php
 date_default_timezone_set('Asia/Kolkata');
-
+require_once 'auth_api.php';
 require_once 'config.php';
 require_once 'connect_event_database.php';
 
 header('Content-Type: application/json');
 
 try {
-    $event_id    = $_POST['event_id'] ?? null;
-    $user_id     = $_POST['user_id'] ?? null;
-    $registration_id = $_POST['registration_id'] ?? null;
-    $print_type  = $_POST['print_type'] ?? null;
-    $status      = $_POST['status'] ?? 1;
-    $is_deleted  = $_POST['is_deleted'] ?? 0;
+     $input = json_decode(file_get_contents("php://input"), true);
+    $event_id    = $input['event_id'] ?? null;
+    $app_user_id     = $input['app_user_id'] ?? null;
+    $user_id     = $input['user_id'] ?? null;
+    $registration_id = $input['registration_id'] ?? null;
+    $print_type  = $input['print_type'] ?? null;
+    $status      = $_POinputST['status'] ?? 1;
+    $is_deleted  = $input['is_deleted'] ?? 0;
 
     if (
         !$event_id ||
@@ -126,6 +128,7 @@ try {
         $checkStmt = $eventConn->prepare("
             SELECT id FROM event_scan_logs_food 
             WHERE event_id = ?
+             AND app_user_id = ?
               AND user_id = ?
               AND registration_id = ?
               AND date = ?
@@ -137,7 +140,7 @@ try {
             throw new Exception("Prepare failed (Duplicate check): " . $eventConn->error);
         }
 
-        $checkStmt->bind_param("iiiss", $event_id, $user_id, $registration_id, $date, $scan_for);
+        $checkStmt->bind_param("iiiiss", $event_id,$app_user_id, $user_id, $registration_id, $date, $scan_for);
         $checkStmt->execute();
         $checkResult = $checkStmt->get_result();
 
@@ -158,16 +161,18 @@ try {
 
     $insertStmt = $eventConn->prepare("
         INSERT INTO event_scan_logs_food (
-            event_id, user_id, registration_id, date, time, print_type, status, is_deleted, scan_for, created_at, updated_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
+            event_id,app_user_id, user_id, registration_id, date, time, print_type, status, is_deleted, scan_for, created_at, updated_at
+        ) VALUES (?,?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     ");
     if (!$insertStmt) {
         throw new Exception("Prepare failed (Insert): " . $eventConn->error);
     }
 
     $insertStmt->bind_param(
-        "iiisssiis",
+        "iiiisssiis",
         $event_id,
+                $app_user_id,
+
         $user_id,
         $registration_id,
         $date,

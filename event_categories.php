@@ -3,9 +3,11 @@ header('Content-Type: application/json');
 
 require_once 'config.php';                
 require_once 'connect_event_database.php'; 
+require_once 'auth_api.php';
 
 try {
-    $eventId = $_GET['event_id'] ?? '';
+    $input = json_decode(file_get_contents("php://input"), true);
+    $eventId = $input['event_id'] ?? '';
 
     if (!$eventId) {
         throw new Exception('Missing event_id');

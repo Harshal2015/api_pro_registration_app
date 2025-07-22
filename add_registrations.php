@@ -1,15 +1,22 @@
 <?php
 header('Content-Type: application/json');
 
-require_once 'config.php';               
+// ✅ STEP 1: Read input ONCE
+$rawInput = file_get_contents('php://input');
+$input = json_decode($rawInput, true);
+
+// ✅ STEP 2: Make input globally reusable for auth_api.php
+$GLOBALS['input_data'] = $input;
+
+// ✅ STEP 3: Include dependencies
+require_once 'auth_api.php';
+require_once 'config.php';
 require_once 'connect_event_database.php';
-require_once 'tables.php';              
+require_once 'tables.php';
 
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
-    $input = json_decode(file_get_contents('php://input'), true);
-
     if (!$input || !isset($input['user'], $input['event_id'], $input['category_id'])) {
         throw new Exception('Invalid input data');
     }

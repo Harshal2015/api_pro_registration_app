@@ -1,6 +1,6 @@
 <?php
 header('Content-Type: application/json');
-
+require_once 'auth_api.php';
 require_once 'config.php';
 require_once 'connect_event_database.php';
 require_once 'tables.php';

@@ -2,12 +2,13 @@
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Kolkata');
 
+require_once 'auth_api.php';
 require_once 'config.php';           
 require_once 'connect_event_database.php'; 
 require_once 'tables.php';
 
 try {
-    $event_id = $_GET['event_id'] ?? $_POST['event_id'] ?? null;
+    $event_id = $_GET['event_id'] ?? $input['event_id'] ?? null;
     if (!$event_id) throw new Exception('Missing event_id');
 
     $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ? LIMIT 1");

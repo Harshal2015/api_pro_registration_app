@@ -4,20 +4,22 @@ header('Content-Type: application/json');
 session_start();
 
 require_once 'config.php';
+require_once 'auth_api.php';
+
 
 $rawInput = file_get_contents("php://input");
 $input = json_decode($rawInput, true);
 
-$user_id = isset($input['user_id']) ? intval($input['user_id']) :
-           (isset($_POST['user_id']) ? intval($_POST['user_id']) : 0);
+$app_user_id = isset($input['app_user_id']) ? intval($input['app_user_id']) :
+           (isset($_POST['app_user_id']) ? intval($_POST['app_user_id']) : 0);
 
-if (!$user_id) {
+if (!$app_user_id) {
     echo json_encode(['success' => false, 'message' => 'User ID required']);
     exit();
 }
 
 $stmt = $conn->prepare("SELECT is_admin, event_id FROM reg_app_users WHERE id = ? AND is_deleted = 0");
-$stmt->bind_param("i", $user_id);
+$stmt->bind_param("i", $app_user_id);
 $stmt->execute();
 $result = $stmt->get_result();
 

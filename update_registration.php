@@ -2,28 +2,36 @@
 header("Content-Type: application/json");
 date_default_timezone_set('Asia/Kolkata');
 
+// Include the auth API — it validates and either ends execution or allows continuation
+require_once 'auth_api.php';
+
+// Now your usual includes for DB connection and constants
 require_once 'config.php';               // provides $conn connected to main DB
 require_once 'connect_event_database.php'; // provides connectEventDb($event_id)
-require_once 'tables.php'; 
+require_once 'tables.php';
 
 try {
-    $event_id    = $_POST['event_id'] ?? null;
-    $user_id     = $_POST['user_id'] ?? null;
-    $category_id = $_POST['category_id'] ?? null;
+    // Since auth_api.php reads JSON from php://input, 
+    // you should do the same here:
+    $input = json_decode(file_get_contents("php://input"), true);
+
+    $event_id    = $input['event_id'] ?? null;
+    $user_id     = $input['user_id'] ?? null;
+    $category_id = $input['category_id'] ?? null;
 
     // Attendee (main DB) update data
-    $prefix            = $_POST['prefix'] ?? null;
-    $first_name        = $_POST['first_name'] ?? '';
-    $last_name         = $_POST['last_name'] ?? '';
-    $phone             = $_POST['primary_phone_number'] ?? '';
-    $email             = $_POST['primary_email_address'] ?? '';
-    $city              = $_POST['city'] ?? '';
-    $state             = $_POST['state'] ?? '';
-    $country           = $_POST['country'] ?? '';
-    $mci_number        = $_POST['professional_registration_number'] ?? '';
-    $registration_type = $_POST['registration_type'] ?? '';
-    $profession        = $_POST['profession'] ?? '';
-    $added_by          = $_POST['added_by'] ?? '';
+    $prefix            = $input['prefix'] ?? null;
+    $first_name        = $input['first_name'] ?? '';
+    $last_name         = $input['last_name'] ?? '';
+    $phone             = $input['primary_phone_number'] ?? '';
+    $email             = $input['primary_email_address'] ?? '';
+    $city              = $input['city'] ?? '';
+    $state             = $input['state'] ?? '';
+    $country           = $input['country'] ?? '';
+    $mci_number        = $input['professional_registration_number'] ?? '';
+    $registration_type = $input['registration_type'] ?? '';
+    $profession        = $input['profession'] ?? '';
+    $added_by          = $input['added_by'] ?? '';
 
     if (!$event_id || !$user_id) {
         throw new Exception("Missing required fields: event_id or user_id");
@@ -68,18 +76,18 @@ try {
 
     if ($attendee) {
         // Use new values if provided, else keep old ones
-        $prefix            = isset($_POST['prefix']) ? $_POST['prefix'] : $attendee['prefix'];
-        $first_name        = isset($_POST['first_name']) ? $_POST['first_name'] : $attendee['first_name'];
-        $last_name         = isset($_POST['last_name']) ? $_POST['last_name'] : $attendee['last_name'];
-        $phone             = isset($_POST['primary_phone_number']) ? $_POST['primary_phone_number'] : $attendee['primary_phone_number'];
-        $email             = isset($_POST['primary_email_address']) ? $_POST['primary_email_address'] : $attendee['primary_email_address'];
-        $city              = isset($_POST['city']) ? $_POST['city'] : $attendee['city'];
-        $state             = isset($_POST['state']) ? $_POST['state'] : $attendee['state'];
-        $country           = isset($_POST['country']) ? $_POST['country'] : $attendee['country'];
-        $mci_number        = isset($_POST['professional_registration_number']) ? $_POST['professional_registration_number'] : $attendee['professional_registration_number'];
-        $registration_type = isset($_POST['registration_type']) ? $_POST['registration_type'] : $attendee['registration_type'];
-        $profession        = isset($_POST['profession']) ? $_POST['profession'] : $attendee['profession'];
-        $added_by          = isset($_POST['added_by']) ? $_POST['added_by'] : $attendee['added_by'];
+        $prefix            = $prefix ?? $attendee['prefix'];
+        $first_name        = $first_name ?: $attendee['first_name'];
+        $last_name         = $last_name ?: $attendee['last_name'];
+        $phone             = $phone ?: $attendee['primary_phone_number'];
+        $email             = $email ?: $attendee['primary_email_address'];
+        $city              = $city ?: $attendee['city'];
+        $state             = $state ?: $attendee['state'];
+        $country           = $country ?: $attendee['country'];
+        $mci_number        = $mci_number ?: $attendee['professional_registration_number'];
+        $registration_type = $registration_type ?: $attendee['registration_type'];
+        $profession        = $profession ?: $attendee['profession'];
+        $added_by          = $added_by ?: $attendee['added_by'];
 
         // Compose short_name (full name)
         $newShortname = trim($first_name . ' ' . $last_name);

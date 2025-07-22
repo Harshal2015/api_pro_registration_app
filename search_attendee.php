@@ -2,10 +2,10 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
-require_once 'config.php';  // uses $conn
+require_once 'config.php';  
 require_once 'connect_event_database.php';
 require_once 'tables.php';
-
+require_once 'auth_api.php';
 $input = json_decode(file_get_contents('php://input'), true);
 $name = trim($input['name'] ?? '');
 $email = trim($input['email'] ?? '');

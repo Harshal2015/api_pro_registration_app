@@ -10,6 +10,7 @@ require_once 'config.php';
 require_once 'connect_event_database.php';
 require_once 'tables.php';
 
+
 try {
     // Get JSON input and decode to array
     $input = json_decode(file_get_contents("php://input"), true);
