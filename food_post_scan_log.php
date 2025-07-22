@@ -9,7 +9,7 @@ header('Content-Type: application/json');
 try {
     $event_id    = $_POST['event_id'] ?? null;
     $user_id     = $_POST['user_id'] ?? null;
-    $attendee_id = $_POST['attendee_id'] ?? null;
+    $registration_id = $_POST['registration_id'] ?? null;
     $print_type  = $_POST['print_type'] ?? null;
     $status      = $_POST['status'] ?? 1;
     $is_deleted  = $_POST['is_deleted'] ?? 0;
@@ -17,12 +17,12 @@ try {
     if (
         !$event_id ||
         (!$user_id && $print_type !== 'Master QR') ||
-        (!$attendee_id && $print_type !== 'Master QR')
+        (!$registration_id && $print_type !== 'Master QR')
     ) {
         throw new Exception(
             "Missing required fields: event_id" .
             (($print_type !== 'Master QR' && !$user_id) ? ", user_id" : "") .
-            (($print_type !== 'Master QR' && !$attendee_id) ? ", attendee_id" : "")
+            (($print_type !== 'Master QR' && !$registration_id) ? ", registration_id" : "")
         );
     }
 
@@ -72,7 +72,7 @@ try {
         if (!$regStmt) {
             throw new Exception("Prepare failed (Registration fetch): " . $eventConn->error);
         }
-        $regStmt->bind_param("i", $attendee_id);
+        $regStmt->bind_param("i", $registration_id);
         $regStmt->execute();
         $regResult = $regStmt->get_result();
 
@@ -127,7 +127,7 @@ try {
             SELECT id FROM event_scan_logs_food 
             WHERE event_id = ?
               AND user_id = ?
-              AND attendee_id = ?
+              AND registration_id = ?
               AND date = ?
               AND scan_for = ?
               AND is_deleted = 0
@@ -137,7 +137,7 @@ try {
             throw new Exception("Prepare failed (Duplicate check): " . $eventConn->error);
         }
 
-        $checkStmt->bind_param("iiiss", $event_id, $user_id, $attendee_id, $date, $scan_for);
+        $checkStmt->bind_param("iiiss", $event_id, $user_id, $registration_id, $date, $scan_for);
         $checkStmt->execute();
         $checkResult = $checkStmt->get_result();
 
@@ -158,7 +158,7 @@ try {
 
     $insertStmt = $eventConn->prepare("
         INSERT INTO event_scan_logs_food (
-            event_id, user_id, attendee_id, date, time, print_type, status, is_deleted, scan_for, created_at, updated_at
+            event_id, user_id, registration_id, date, time, print_type, status, is_deleted, scan_for, created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
     ");
     if (!$insertStmt) {
@@ -169,7 +169,7 @@ try {
         "iiisssiis",
         $event_id,
         $user_id,
-        $attendee_id,
+        $registration_id,
         $date,
         $time,
         $print_type,

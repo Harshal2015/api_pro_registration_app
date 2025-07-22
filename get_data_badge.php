@@ -25,7 +25,7 @@ try {
     $eventConn = $eventResult['conn'];
 
     $scanStmt = $eventConn->prepare("
-        SELECT user_id, attendee_id, print_type, date, time
+        SELECT user_id, registration_id, print_type, date, time
         FROM event_scan_logg
         WHERE event_id = ? AND scan_for = 'badge' AND is_deleted = 0
         ORDER BY date ASC, time ASC
@@ -36,7 +36,7 @@ try {
 
     $scanMap = [];
     while ($s = $scanResult->fetch_assoc()) {
-        $key = $s['user_id'] . ':' . $s['attendee_id'];
+        $key = $s['user_id'] . ':' . $s['registration_id'];
         $dt = $s['date'] . ' ' . $s['time'];
         $ptype = strtolower($s['print_type']);
 
@@ -55,7 +55,7 @@ try {
     $scanStmt->close();
 
     $regStmt = $eventConn->prepare("
-        SELECT er.user_id, er.id AS attendee_id, ec.name AS category_name
+        SELECT er.user_id, er.id AS registration_id, ec.name AS category_name
         FROM event_registrations er
         LEFT JOIN event_categories ec ON er.category_id = ec.id
         WHERE er.event_id = ? AND er.is_deleted = 0
@@ -94,7 +94,7 @@ try {
 
     $report = [];
     foreach ($registrations as $reg) {
-        $key = $reg['user_id'] . ':' . $reg['attendee_id'];
+        $key = $reg['user_id'] . ':' . $reg['registration_id'];
         $attendeeName = 'Unknown Attendee';
 
         if (isset($attendees[$reg['user_id']])) {
@@ -133,7 +133,7 @@ try {
         foreach ($statusEntries as $entry) {
             $report[] = [
                 'user_id'       => $reg['user_id'],
-                'attendee_id'   => $reg['attendee_id'],
+                'registration_id'   => $reg['registration_id'],
                 'attendee_name' => $attendeeName,
                 'category_name' => $reg['category_name'] ?? 'Unknown Category',
                 'status'        => $entry['status'],
@@ -147,7 +147,7 @@ try {
     $totalReissued = 0;
 
     foreach ($report as $row) {
-        $key = $row['user_id'] . ':' . $row['attendee_id'];
+        $key = $row['user_id'] . ':' . $row['registration_id'];
         if ($row['status'] !== 'Not Collected') {
             $collectedKeys[$key] = true;
         }

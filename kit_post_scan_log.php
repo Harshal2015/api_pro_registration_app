@@ -9,7 +9,7 @@ try {
     // Step 1: Collect Input
     $event_id    = $_POST['event_id'] ?? null;
     $user_id     = $_POST['user_id'] ?? null;
-    $attendee_id = $_POST['attendee_id'] ?? null;
+    $registration_id = $_POST['registration_id'] ?? null;
     $app_user_id = $_POST['app_user_id'] ?? null;
     $print_type  = $_POST['print_type'] ?? null;
     $status      = $_POST['status'] ?? 1;
@@ -19,8 +19,8 @@ try {
     $scan_for    = $_POST['scan_for'] ?? 'kit';
 
     // Step 2: Validate required inputs
-    if (!$event_id || !$user_id || !$attendee_id || !$app_user_id) {
-        throw new Exception("Missing required fields: event_id, user_id, attendee_id, or app_user_id");
+    if (!$event_id || !$user_id || !$registration_id || !$app_user_id) {
+        throw new Exception("Missing required fields: event_id, user_id, registration_id, or app_user_id");
     }
 
     // Step 3: Get event short name
@@ -42,7 +42,7 @@ try {
     // Step 5: Fetch category_id of the attendee
     $regStmt = $eventConn->prepare("SELECT category_id FROM event_registrations WHERE id = ? LIMIT 1");
     if (!$regStmt) throw new Exception("Prepare failed (Registration fetch): " . $eventConn->error);
-    $regStmt->bind_param("i", $attendee_id);
+    $regStmt->bind_param("i", $registration_id);
     $regStmt->execute();
     $regResult = $regStmt->get_result();
     if ($regResult->num_rows === 0) throw new Exception("Attendee not found in event_registrations.");
@@ -72,12 +72,12 @@ try {
     // Step 7: Check for duplicate scan (unless Reissued)
     $checkStmt = $eventConn->prepare("
         SELECT id FROM event_scan_logg 
-        WHERE event_id = ? AND user_id = ? AND attendee_id = ? 
+        WHERE event_id = ? AND user_id = ? AND registration_id = ? 
           AND app_user_id = ? AND is_deleted = 0 AND scan_for = ?
         LIMIT 1
     ");
     if (!$checkStmt) throw new Exception("Prepare failed (Duplicate check): " . $eventConn->error);
-    $checkStmt->bind_param("iiiis", $event_id, $user_id, $attendee_id, $app_user_id, $scan_for);
+    $checkStmt->bind_param("iiiis", $event_id, $user_id, $registration_id, $app_user_id, $scan_for);
     $checkStmt->execute();
     $checkResult = $checkStmt->get_result();
     $alreadyScanned = $checkResult->num_rows > 0;
@@ -97,7 +97,7 @@ try {
     // Step 8: Insert scan log
     $insertStmt = $eventConn->prepare("
         INSERT INTO event_scan_logg (
-            event_id, user_id, attendee_id, app_user_id,
+            event_id, user_id, registration_id, app_user_id,
             date, time, print_type, status, is_deleted, scan_for,
             created_at, updated_at
         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())
@@ -108,7 +108,7 @@ try {
         "iiiisssiss",
         $event_id,
         $user_id,
-        $attendee_id,
+        $registration_id,
         $app_user_id,
         $date,
         $time,

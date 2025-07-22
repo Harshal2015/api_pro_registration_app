@@ -24,7 +24,7 @@ try {
     $eventConn = $eventResult['conn'];
 
     $scanStmt = $eventConn->prepare("
-        SELECT user_id, attendee_id, print_type, scan_for, date, time
+        SELECT user_id, registration_id, print_type, scan_for, date, time
         FROM event_scan_logs_food
         WHERE event_id = ? AND scan_for IN ('lunch', 'dinner') AND is_deleted = 0
         ORDER BY date ASC, time ASC
@@ -50,7 +50,7 @@ try {
     ];
 
     foreach ($scans as $s) {
-        $key = $s['user_id'] . ':' . $s['attendee_id'];
+        $key = $s['user_id'] . ':' . $s['registration_id'];
         $dt = $s['date'];  // Only date part for daily counts
         $ptype = strtolower(trim($s['print_type']));
         $meal = strtolower(trim($s['scan_for']));
@@ -77,7 +77,7 @@ try {
     }
 
     $regStmt = $eventConn->prepare("
-        SELECT er.user_id, er.id AS attendee_id, ec.name AS category_name
+        SELECT er.user_id, er.id AS registration_id, ec.name AS category_name
         FROM event_registrations er
         LEFT JOIN event_categories ec ON er.category_id = ec.id
         WHERE er.event_id = ? AND er.is_deleted = 0
@@ -119,7 +119,7 @@ try {
 
     $report = [];
     foreach ($registrations as $reg) {
-        $key = $reg['user_id'] . ':' . $reg['attendee_id'];
+        $key = $reg['user_id'] . ':' . $reg['registration_id'];
 
         $attendeeName = 'Unknown Attendee';
         if (isset($attendees[$reg['user_id']])) {
@@ -138,7 +138,7 @@ try {
             if (empty($entries)) {
                 $report[] = [
                     'user_id'       => $reg['user_id'],
-                    'attendee_id'   => $reg['attendee_id'],
+                    'registration_id'   => $reg['registration_id'],
                     'attendee_name' => $attendeeName,
                     'category_name' => $reg['category_name'] ?? 'Unknown Category',
                     'meal'          => ucfirst($meal),
@@ -155,7 +155,7 @@ try {
                         $totals[$meal . '_taken']++;
                         $report[] = [
                             'user_id'       => $reg['user_id'],
-                            'attendee_id'   => $reg['attendee_id'],
+                            'registration_id'   => $reg['registration_id'],
                             'attendee_name' => $attendeeName,
                             'category_name' => $reg['category_name'] ?? 'Unknown Category',
                             'meal'          => ucfirst($meal),
@@ -168,7 +168,7 @@ try {
                     $totals[$meal . '_retaken']++;
                     $report[] = [
                         'user_id'       => $reg['user_id'],
-                        'attendee_id'   => $reg['attendee_id'],
+                        'registration_id'   => $reg['registration_id'],
                         'attendee_name' => $attendeeName,
                         'category_name' => $reg['category_name'] ?? 'Unknown Category',
                         'meal'          => ucfirst($meal),
@@ -187,7 +187,7 @@ try {
         'total_dinner'     => $totals['dinner_taken'] + $totals['dinner_retaken'] + $masterCount['dinner'],
         'master_qr_lunch'  => $masterCount['lunch'],
         'master_qr_dinner' => $masterCount['dinner'],
-        'master_qr_daily'    => $masterQrDaily,  // date-wise master QR counts added here
+        'master_qr_daily'    => $masterQrDaily,  
         'lunch_retaken'    => $totals['lunch_retaken'],
         'dinner_retaken'   => $totals['dinner_retaken'],
         'lunch_taken'      => $totals['lunch_taken'],

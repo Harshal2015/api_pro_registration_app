@@ -4,6 +4,7 @@ date_default_timezone_set('Asia/Kolkata');
 
 require_once 'config.php';               // provides $conn connected to main DB
 require_once 'connect_event_database.php'; // provides connectEventDb($event_id)
+require_once 'tables.php'; 
 
 try {
     $event_id    = $_POST['event_id'] ?? null;
@@ -135,11 +136,10 @@ try {
     // ✅ SUCCESS response
     echo json_encode([
         'success' => true,
-        'message' => 'Update successful.'
+        'message' => 'Updated Successfully.'
     ]);
 
 } catch (Exception $e) {
-    // ❌ ERROR response
     http_response_code(400);
     echo json_encode([
         'success' => false,

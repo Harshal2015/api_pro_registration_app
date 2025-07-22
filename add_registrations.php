@@ -191,7 +191,7 @@ try {
     $stmt->execute();
     $stmt->close();
 
-    echo json_encode(['success' => true, 'message' => 'User registered successfully']);
+    echo json_encode(['success' => true, 'message' => 'User Registered Successfully']);
 
 } catch (Exception $e) {
     http_response_code(400);

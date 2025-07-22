@@ -31,9 +31,9 @@ try {
 
     $eventConn = $eventResult['conn'];
 
-    // Step 3: Fetch categories (not halls)
+    // Step 3: Fetch all categories (excluding deleted)
     $categorySql = "SELECT id, name FROM event_categories 
-                    WHERE parent_id IS NOT NULL AND is_hall = 0 AND is_deleted = 0";
+                    WHERE parent_id IS NOT NULL AND is_deleted = 0";
     $categoryResult = $eventConn->query($categorySql);
 
     $categories = [];
@@ -46,26 +46,10 @@ try {
         }
     }
 
-    // Step 4: Fetch halls
-    $hallSql = "SELECT id, name FROM event_categories 
-                WHERE is_hall = 1 AND is_deleted = 0";
-    $hallResult = $eventConn->query($hallSql);
-
-    $halls = [];
-    if ($hallResult && $hallResult->num_rows > 0) {
-        while ($row = $hallResult->fetch_assoc()) {
-            $halls[] = [
-                'id' => (int)$row['id'],
-                'name' => $row['name']
-            ];
-        }
-    }
-
-    // Step 5: Return response
+    // Step 4: Return response (only categories)
     echo json_encode([
         'success' => true,
-        'categories' => $categories,
-        'halls' => $halls
+        'categories' => $categories
     ]);
 
     $eventConn->close();
