@@ -6,9 +6,9 @@ date_default_timezone_set('Asia/Kolkata');
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-require_once 'config.php';           
+require_once 'config.php';
 require_once 'connect_event_database.php';
-require_once 'tables.php';  
+require_once 'tables.php';
 
 try {
     // Get JSON input and decode to array
@@ -21,7 +21,7 @@ try {
     $attendee_name        = isset($input['attendee_name']) ? trim($input['attendee_name']) : '';
     $attendee_category    = isset($input['attendee_category']) ? trim($input['attendee_category']) : '';
     $attendee_subcategory = isset($input['attendee_subcategory']) ? trim($input['attendee_subcategory']) : '';
-    $action_type          = isset($input['action_type']) ? intval($input['action_type']) : 0; 
+    $action_type          = isset($input['action_type']) ? intval($input['action_type']) : 0;
 
     if (!$app_user_id || !$event_id || !$action_type) {
         throw new Exception("Missing required fields: app_user_id, event_id, and action_type are mandatory");
@@ -36,28 +36,47 @@ try {
 
     $now = date('Y-m-d H:i:s');
 
-    // Check if a record already exists for this user and event
-    $checkQuery = $eventConn->prepare("SELECT id, is_preview FROM " . TABLE_BADGE_PRINT_ANIMATION . " WHERE app_user_id = ? AND event_id = ? AND is_delete = 0 LIMIT 1");
+    // Check if a record already exists for this app_user_id, event_id, and attendee_id
+    $checkQuery = $eventConn->prepare("
+        SELECT id, is_preview 
+        FROM " . TABLE_BADGE_PRINT_ANIMATION . " 
+        WHERE app_user_id = ? AND event_id = ? AND attendee_id = ? AND is_delete = 0 
+        LIMIT 1
+    ");
     if (!$checkQuery) {
         throw new Exception("Prepare failed: " . $eventConn->error);
     }
-    $checkQuery->bind_param("ii", $app_user_id, $event_id);
+    $checkQuery->bind_param("iii", $app_user_id, $event_id, $attendee_id);
     $checkQuery->execute();
     $result = $checkQuery->get_result();
 
-    if ($result->num_rows === 0 && $action_type === 1) {
-        // Insert new record if none exists and action_type is 1
+    if ($result->num_rows === 0) {
+        // No matching record: insert new
         $insertQuery = $eventConn->prepare("
             INSERT INTO " . TABLE_BADGE_PRINT_ANIMATION . " 
             (app_user_id, event_id, attendee_id, attendee_name, attendee_category, attendee_subcategory, is_preview, is_printed, is_delete, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, 1, 0, 0, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
         ");
         if (!$insertQuery) {
             throw new Exception("Prepare insert failed: " . $eventConn->error);
         }
-        // Bind parameters — 8 placeholders total
-        // Types: i (int), i, i, s (string), s, s, s, s
-        $insertQuery->bind_param("iiisssss", $app_user_id, $event_id, $attendee_id, $attendee_name, $attendee_category, $attendee_subcategory, $now, $now);
+
+        $is_preview = $action_type;
+        $is_printed = ($action_type === 4) ? 1 : 0;
+
+        $insertQuery->bind_param(
+            "iiisssiiss",
+            $app_user_id,
+            $event_id,
+            $attendee_id,
+            $attendee_name,
+            $attendee_category,
+            $attendee_subcategory,
+            $is_preview,
+            $is_printed,
+            $now,
+            $now
+        );
 
         if ($insertQuery->execute()) {
             echo json_encode(["success" => true, "message" => "Inserted successfully"]);
@@ -66,8 +85,8 @@ try {
         }
         $insertQuery->close();
 
-    } elseif ($result->num_rows > 0) {
-        // Update existing record based on action_type
+    } else {
+        // Matching record exists: update
         $row = $result->fetch_assoc();
 
         $is_preview = $action_type;
@@ -81,6 +100,7 @@ try {
         if (!$updateQuery) {
             throw new Exception("Prepare update failed: " . $eventConn->error);
         }
+
         $updateQuery->bind_param("iisi", $is_preview, $is_printed, $now, $row['id']);
 
         if ($updateQuery->execute()) {
@@ -89,9 +109,6 @@ try {
             throw new Exception("Update failed: " . $updateQuery->error);
         }
         $updateQuery->close();
-
-    } else {
-        throw new Exception("No matching record found for update or wrong action type");
     }
 
     $checkQuery->close();
