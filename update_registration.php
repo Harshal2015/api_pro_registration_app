@@ -58,7 +58,7 @@ try {
     }
 
     // Step 4: Check and update attendees_1 table in main DB
-    $checkAttendee = $mainConn->prepare("SELECT * FROM attendees_1 WHERE id = ?");
+    $checkAttendee = $mainConn->prepare("SELECT * FROM " . TABLE_ATTENDEES . " WHERE id = ?");
     $checkAttendee->bind_param("i", $user_id);
     $checkAttendee->execute();
     $attendeeResult = $checkAttendee->get_result();
@@ -101,7 +101,7 @@ try {
 
         if ($needsUpdate) {
             $updateAttendee = $mainConn->prepare("
-                UPDATE attendees_1
+                UPDATE " . TABLE_ATTENDEES . "
                 SET prefix = ?, first_name = ?, last_name = ?, primary_phone_number = ?, 
                     primary_email_address = ?, city = ?, state = ?, country = ?, 
                     professional_registration_number = ?, registration_type = ?, 

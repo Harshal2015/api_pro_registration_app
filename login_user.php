@@ -6,7 +6,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $input_username = $_POST['username'] ?? '';
     $input_password = $_POST['password'] ?? '';
 
-    $stmt = $conn->prepare("SELECT id, username, password, access_chips, is_admin FROM users WHERE username = ? AND is_deleted = FALSE");
+    $stmt = $conn->prepare("SELECT id, username, password, access_chips, is_admin FROM reg_app_users WHERE username = ? AND is_deleted = FALSE");
     $stmt->bind_param("s", $input_username);
     $stmt->execute();
 

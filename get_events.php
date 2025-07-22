@@ -16,7 +16,7 @@ if (!$user_id) {
     exit();
 }
 
-$stmt = $conn->prepare("SELECT is_admin, event_id FROM users WHERE id = ? AND is_deleted = 0");
+$stmt = $conn->prepare("SELECT is_admin, event_id FROM reg_app_users WHERE id = ? AND is_deleted = 0");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
 $result = $stmt->get_result();

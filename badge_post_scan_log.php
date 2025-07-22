@@ -8,7 +8,7 @@ require_once 'connect_event_database.php';
 try {
     $event_id    = $_POST['event_id'] ?? null;
     $user_id     = $_POST['user_id'] ?? null;
-    $attendee_id = $_POST['attendee_id'] ?? null;
+    $registration_id = $_POST['registration_id'] ?? null;
     $app_user_id = $_POST['app_user_id'] ?? null;
 
     $date        = $_POST['date'] ?? date('Y-m-d');
@@ -18,8 +18,8 @@ try {
     $print_type  = $_POST['print_type'] ?? 'Issued';
     $scan_for    = $_POST['scan_for'] ?? 'badge';
 
-    if (!$event_id || !$user_id || !$attendee_id) {
-        throw new Exception("Missing required fields: event_id, user_id, or attendee_id");
+    if (!$event_id || !$user_id || !$registration_id) {
+        throw new Exception("Missing required fields: event_id, user_id, or registration_id");
     }
 
     $connectionResult = connectEventDb($event_id);
@@ -32,10 +32,10 @@ try {
 
     $checkStmt = $eventConn->prepare("
         SELECT id FROM event_scan_logg
-        WHERE event_id = ? AND user_id = ? AND attendee_id = ? AND is_deleted = 0 AND scan_for = ?
+        WHERE event_id = ? AND user_id = ? AND registration_id = ? AND is_deleted = 0 AND scan_for = ?
         LIMIT 1
     ");
-    $checkStmt->bind_param("iiis", $event_id, $user_id, $attendee_id, $scan_for);
+    $checkStmt->bind_param("iiis", $event_id, $user_id, $registration_id, $scan_for);
     $checkStmt->execute();
     $checkResult = $checkStmt->get_result();
     $alreadyScanned = $checkResult->fetch_assoc();
@@ -52,7 +52,7 @@ try {
 
     $insertStmt = $eventConn->prepare("
         INSERT INTO event_scan_logg (
-            event_id, user_id, attendee_id, app_user_id, date, time,
+            event_id, user_id, registration_id, app_user_id, date, time,
             print_type, status, is_deleted, scan_for, created_at, updated_at
         ) VALUES (
             ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
@@ -62,7 +62,7 @@ try {
         "iiiisssiis",
         $event_id,
         $user_id,
-        $attendee_id,
+        $registration_id,
         $app_user_id,
         $date,
         $time,
