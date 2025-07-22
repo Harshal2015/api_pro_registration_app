@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 21, 2025 at 03:00 PM
+-- Generation Time: Jul 22, 2025 at 10:48 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -123,10 +123,6 @@ INSERT INTO `event_categories` (`id`, `event_id`, `parent_id`, `name`, `is_hall`
 (6, 1, '2', 'Fellows', 0, 1, 1, 1, 1, 1, 1, 1, 0, '2025-06-21 11:17:40', '2025-06-21 11:17:40'),
 (7, 1, '1', 'Course Director', 0, 1, 1, 1, 1, 1, 1, 1, 0, '2025-07-01 11:53:22', '2025-07-01 12:19:38'),
 (8, 1, '1', 'Course Co-Director', 0, 1, 1, 1, 1, 1, 1, 1, 0, '2025-07-01 11:53:41', '2025-07-01 12:19:46'),
-(9, 1, NULL, 'Hall A', 1, 0, 0, 0, 0, 0, 0, 0, 0, '2025-06-21 11:16:24', '2025-06-21 11:16:24'),
-(10, 1, NULL, 'Hall B', 1, 0, 0, 0, 0, 0, 0, 0, 0, '2025-06-21 11:16:24', '2025-06-21 11:16:24'),
-(11, 1, NULL, 'Hall C', 1, 0, 0, 0, 0, 0, 0, 0, 0, '2025-06-21 11:16:24', '2025-06-21 11:16:24'),
-(12, 1, NULL, 'Hall D', 1, 0, 0, 0, 0, 0, 0, 0, 0, '2025-06-21 11:16:24', '2025-06-21 11:16:24'),
 (13, 1, '1', 'Industry', 0, 1, 0, 0, 0, 1, 0, 1, 0, '2025-07-01 11:53:41', '2025-07-01 12:19:46');
 
 -- --------------------------------------------------------
@@ -946,7 +942,8 @@ INSERT INTO `event_registrations` (`id`, `event_id`, `user_id`, `category_id`, `
 (581, 1, 1249, 2, 1, 1, 1, 1, 1, 1, 1, 1, 0.00, 'TXN123456', NULL, NULL, NULL, 'Credit Card', 1, 'admin', 0, '2025-07-17 14:11:05', '2025-07-17 14:11:05'),
 (582, 1, 1250, 6, 1, 1, 1, 1, 1, 1, 1, 1, 0.00, NULL, NULL, NULL, NULL, 'Online', 1, 'Fellows', 0, '2025-07-17 14:12:24', '2025-07-17 14:12:24'),
 (583, 1, 1251, 7, 1, 1, 1, 1, 1, 1, 1, 1, 0.00, NULL, NULL, NULL, NULL, 'Online', 1, 'Course Director', 0, '2025-07-17 14:55:04', '2025-07-17 14:55:04'),
-(584, 1, 1252, 3, 1, 1, 1, 1, 1, 1, 1, 1, 0.00, NULL, NULL, NULL, NULL, 'Online', 1, '', 0, '2025-07-21 17:44:19', '2025-07-21 17:44:19');
+(584, 1, 1252, 3, 1, 1, 1, 1, 1, 1, 1, 1, 0.00, NULL, NULL, NULL, NULL, 'Online', 1, '', 0, '2025-07-21 17:44:19', '2025-07-21 17:44:19'),
+(585, 1, 1253, 3, 1, 1, 1, 1, 1, 1, 1, 1, 0.00, NULL, NULL, NULL, NULL, 'Online', 1, '', 0, '2025-07-21 18:35:56', '2025-07-21 18:35:56');
 
 -- --------------------------------------------------------
 
@@ -977,7 +974,7 @@ CREATE TABLE `event_scan_logg` (
   `app_user_id` int(11) NOT NULL,
   `event_id` int(11) NOT NULL,
   `user_id` int(11) NOT NULL,
-  `attendee_id` int(11) NOT NULL,
+  `registration_id` int(11) NOT NULL,
   `scan_for` enum('Badge','Kit','Certificate') NOT NULL,
   `date` varchar(100) NOT NULL,
   `time` varchar(100) NOT NULL,
@@ -987,17 +984,6 @@ CREATE TABLE `event_scan_logg` (
   `created_at` datetime DEFAULT current_timestamp(),
   `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `event_scan_logg`
---
-
-INSERT INTO `event_scan_logg` (`id`, `app_user_id`, `event_id`, `user_id`, `attendee_id`, `scan_for`, `date`, `time`, `print_type`, `status`, `is_deleted`, `created_at`, `updated_at`) VALUES
-(216, 10, 1, 22, 5, 'Badge', '2025-07-21', '15:35:47', 'Issued', 1, 0, '2025-07-21 15:35:47', '2025-07-21 15:35:47'),
-(217, 10, 1, 22, 5, 'Badge', '2025-07-21', '15:36:10', 'Reissued', 1, 0, '2025-07-21 15:36:10', '2025-07-21 15:36:10'),
-(218, 10, 1, 22, 5, 'Badge', '2025-07-21', '15:36:59', 'Reissued', 1, 0, '2025-07-21 15:36:59', '2025-07-21 15:36:59'),
-(219, 10, 1, 22, 5, 'Kit', '2025-07-21', '15:37:10', 'Issued', 1, 0, '2025-07-21 15:37:10', '2025-07-21 15:37:10'),
-(220, 10, 1, 22, 5, 'Kit', '2025-07-21', '15:38:13', 'Reissued', 1, 0, '2025-07-21 15:38:13', '2025-07-21 15:38:13');
 
 -- --------------------------------------------------------
 
@@ -1027,7 +1013,12 @@ CREATE TABLE `event_scan_logs_food` (
 INSERT INTO `event_scan_logs_food` (`id`, `event_id`, `user_id`, `attendee_id`, `scan_for`, `date`, `time`, `print_type`, `status`, `is_deleted`, `created_at`, `updated_at`) VALUES
 (100, 1, 5, 8, 'Dinner', '2025-09-11', '18:14:21', 'Issued', 1, 0, '2025-07-21 12:44:21', '2025-07-21 12:45:22'),
 (101, 1, 5, 8, 'Dinner', '2025-09-12', '18:14:27', 'Reissued', 1, 0, '2025-07-21 12:44:27', '2025-07-21 12:45:29'),
-(102, 1, 0, 0, 'Dinner', '2025-09-13', '18:14:30', 'Master QR', 1, 0, '2025-07-21 12:44:30', '2025-07-21 12:54:17');
+(102, 1, 0, 0, 'Dinner', '2025-09-13', '18:14:30', 'Master QR', 1, 0, '2025-07-21 12:44:30', '2025-07-21 12:54:17'),
+(103, 1, 5, 8, 'Dinner', '2025-07-21', '18:35:10', 'Issued', 1, 0, '2025-07-21 13:05:10', '2025-07-21 13:05:10'),
+(104, 1, 5, 8, 'Dinner', '2025-07-21', '18:35:17', 'Reissued', 1, 0, '2025-07-21 13:05:17', '2025-07-21 13:05:17'),
+(105, 1, 0, 0, 'Dinner', '2025-07-21', '18:35:20', 'Master QR', 1, 0, '2025-07-21 13:05:20', '2025-07-21 13:05:20'),
+(106, 1, 222, 223, 'Lunch', '2025-07-22', '11:22:27', 'Issued', 1, 0, '2025-07-22 05:52:27', '2025-07-22 05:52:27'),
+(107, 1, 222, 223, 'Lunch', '2025-07-22', '11:22:31', 'Reissued', 1, 0, '2025-07-22 05:52:31', '2025-07-22 05:52:31');
 
 -- --------------------------------------------------------
 
@@ -1156,7 +1147,9 @@ CREATE TABLE `tbl_badge_print_animation` (
 --
 
 INSERT INTO `tbl_badge_print_animation` (`id`, `app_user_id`, `event_id`, `attendee_id`, `attendee_name`, `attendee_category`, `attendee_subcategory`, `is_preview`, `is_printed`, `is_delete`, `created_at`, `updated_at`) VALUES
-(48, 10, 1, 20, 'SAMEER  KAPADIA', 'International Faculty', '', 2, 0, 0, '2025-07-17 13:52:24', '2025-07-21 10:07:04');
+(48, 10, 1, 20, 'SAMEER  KAPADIA', 'International Faculty', '', 4, 1, 0, '2025-07-17 13:52:24', '2025-07-22 04:45:41'),
+(49, 1, 1, 223, 'Harsh Wardhan', 'National Faculty', '', 4, 1, 0, '2025-07-22 04:56:43', '2025-07-22 04:57:49'),
+(50, 10, 1, 223, 'Harsh Wardhan', 'National Faculty', '', 2, 0, 0, '2025-07-22 05:04:06', '2025-07-22 08:45:13');
 
 -- --------------------------------------------------------
 
@@ -29762,7 +29755,7 @@ ALTER TABLE `event_managers`
 -- AUTO_INCREMENT for table `event_registrations`
 --
 ALTER TABLE `event_registrations`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=585;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=586;
 
 --
 -- AUTO_INCREMENT for table `event_registration_allocations`
@@ -29774,13 +29767,13 @@ ALTER TABLE `event_registration_allocations`
 -- AUTO_INCREMENT for table `event_scan_logg`
 --
 ALTER TABLE `event_scan_logg`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=221;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=245;
 
 --
 -- AUTO_INCREMENT for table `event_scan_logs_food`
 --
 ALTER TABLE `event_scan_logs_food`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=103;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=108;
 
 --
 -- AUTO_INCREMENT for table `event_travels`
@@ -29804,7 +29797,7 @@ ALTER TABLE `files`
 -- AUTO_INCREMENT for table `tbl_badge_print_animation`
 --
 ALTER TABLE `tbl_badge_print_animation`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=49;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=51;
 
 --
 -- AUTO_INCREMENT for table `tbl_scan_logs`
