@@ -6,7 +6,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $input_username = $_POST['username'] ?? '';
     $input_password = $_POST['password'] ?? '';
 
-    $stmt = $conn->prepare("SELECT id, username, password, access_chips, is_admin FROM reg_app_users WHERE username = ? AND is_deleted = FALSE");
+    $stmt = $conn->prepare("SELECT id, username, password,api_key, access_chips, is_admin FROM reg_app_users WHERE username = ? AND is_deleted = FALSE");
     $stmt->bind_param("s", $input_username);
     $stmt->execute();
 
@@ -17,6 +17,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($input_password === $row['password']) {
             $_SESSION['user_id']       = $row['id'];
             $_SESSION['username']      = $row['username'];
+                        $_SESSION['api_key']      = $row['api_key'];
+
             $_SESSION['access_chips']  = $row['access_chips'];
             $_SESSION['is_admin']      = $row['is_admin'];
 
@@ -25,6 +27,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 'message'      => 'Login successful',
                 'user_id'      => $row['id'],
                 'username'     => $row['username'],
+                                'api_key'     => $row['api_key'],
+
                 'access_chips' => $row['access_chips'],
                 'is_admin'     => $row['is_admin'],
             ]);

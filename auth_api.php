@@ -7,12 +7,12 @@ header("Content-Type: application/json");
 $input = json_decode(file_get_contents("php://input"), true);
 
 // Validate input
-$user_id = $input['user_id'] ?? null;
+$app_user_id = $input['app_user_id'] ?? null;
 $api_key = $input['api_key'] ?? null;
 
-if (!$user_id || !$api_key) {
+if (!$app_user_id    || !$api_key) {
     http_response_code(400);
-    echo json_encode(["status" => "error", "message" => "Missing user_id or api_key"]);
+    echo json_encode(["status" => "error", "message" => "Missing app_user_id or api_key"]);
     exit;
 }
 
@@ -27,7 +27,7 @@ if ($conn->connect_error) {
 
 // Check user and api_key
 $stmt = $conn->prepare("SELECT * FROM reg_app_users WHERE id = ? AND api_key = ?");
-$stmt->bind_param("ss", $user_id, $api_key);
+$stmt->bind_param("ss", $app_user_id, $api_key);
 $stmt->execute();
 $result = $stmt->get_result();
 

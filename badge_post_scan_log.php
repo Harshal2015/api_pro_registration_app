@@ -2,21 +2,26 @@
 header("Content-Type: application/json");
 date_default_timezone_set('Asia/Kolkata');
 
+require_once 'auth_api.php';
 require_once 'config.php';               
 require_once 'connect_event_database.php';      
 
 try {
-    $event_id    = $_POST['event_id'] ?? null;
-    $user_id     = $_POST['user_id'] ?? null;
-    $registration_id = $_POST['registration_id'] ?? null;
-    $app_user_id = $_POST['app_user_id'] ?? null;
+  $input = json_decode(file_get_contents("php://input"), true);
 
-    $date        = $_POST['date'] ?? date('Y-m-d');
-    $time        = $_POST['time'] ?? date('H:i:s');
-    $status      = $_POST['status'] ?? 1;
-    $is_deleted   = $_POST['is_deleted'] ?? 0;
-    $print_type  = $_POST['print_type'] ?? 'Issued';
-    $scan_for    = $_POST['scan_for'] ?? 'badge';
+$event_id        = $input['event_id'] ?? null;
+$user_id         = $input['user_id'] ?? null;
+$registration_id = $input['registration_id'] ?? null;
+$app_user_id     = $input['app_user_id'] ?? null;
+$api_key         = $input['api_key'] ?? null;
+
+$date            = $input['date'] ?? date('Y-m-d');
+$time            = $input['time'] ?? date('H:i:s');
+$status          = $input['status'] ?? 1;
+$is_deleted      = $input['is_deleted'] ?? 0;
+$print_type      = $input['print_type'] ?? 'Issued';
+$scan_for        = $input['scan_for'] ?? 'badge';
+
 
     if (!$event_id || !$user_id || !$registration_id) {
         throw new Exception("Missing required fields: event_id, user_id, or registration_id");
