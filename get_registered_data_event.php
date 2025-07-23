@@ -5,6 +5,7 @@ require_once 'config.php';
 require_once 'connect_event_database.php';
 require_once 'tables.php';
 
+// Read input
 $input = json_decode(file_get_contents("php://input"), true);
 $event_id = isset($input['event_id']) ? intval($input['event_id']) : 0;
 $page = isset($input['page']) ? max(1, intval($input['page'])) : 1;
@@ -15,6 +16,7 @@ if (!$event_id) {
     exit();
 }
 
+// Connect to event DB
 $connectionResult = connectEventDb($event_id);
 if (!$connectionResult['success']) {
     echo json_encode($connectionResult);
@@ -24,23 +26,47 @@ if (!$connectionResult['success']) {
 $eventConn = $connectionResult['conn'];
 $eventDb = $connectionResult['db_name'];
 
+// Pagination setup
 $offset = ($page - 1) * $page_size;
 
+// Get count of registrations
 $countQuery = "SELECT COUNT(*) as total_count FROM {$eventDb}.event_registrations WHERE is_deleted = 0 AND event_id = ?";
 $countStmt = $eventConn->prepare($countQuery);
 $countStmt->bind_param("i", $event_id);
 $countStmt->execute();
 $countResult = $countStmt->get_result();
-$totalCount = $countResult->fetch_assoc()['total_count'] ?? 0;
+$registeredCount = $countResult->fetch_assoc()['total_count'] ?? 0;
 $countStmt->close();
 
-if ($totalCount === 0) {
-    echo json_encode(['success' => true, 'total_count' => 0, 'data' => []]);
+// Get count of event industries
+$industryCountQuery = "SELECT COUNT(*) as total_count FROM {$eventDb}.event_industries WHERE is_deleted = 0 AND event_id = ?";
+$industryCountStmt = $eventConn->prepare($industryCountQuery);
+$industryCountStmt->bind_param("i", $event_id);
+$industryCountStmt->execute();
+$industryCountResult = $industryCountStmt->get_result();
+$industriesCount = $industryCountResult->fetch_assoc()['total_count'] ?? 0;
+$industryCountStmt->close();
+
+// If no registrations and industries, return empty
+if ($registeredCount === 0 && $industriesCount === 0) {
+    echo json_encode([
+        'success' => true,
+        'total_count' => 0,
+        'registered_count' => 0,
+        'industries_count' => 0,
+        'page' => $page,
+        'page_size' => $page_size,
+        'data' => [],
+        'event_industries' => []
+    ]);
     $eventConn->close();
     exit();
 }
 
-$limitClause = ($page_size === 0) ? "" : "LIMIT ? OFFSET ?";
+// Prepare LIMIT clause (inject directly since bind_param does not support LIMIT/OFFSET)
+$limitOffsetClause = $page_size > 0 ? "LIMIT $page_size OFFSET $offset" : "";
+
+// Fetch registrations with pagination
 $query = "
     SELECT 
         er.*, 
@@ -54,19 +80,11 @@ $query = "
     LEFT JOIN {$mainDb}." . TABLE_ATTENDEES . " a ON er.user_id = a.id
     LEFT JOIN {$eventDb}.event_categories c ON er.category_id = c.id
     WHERE er.is_deleted = 0 AND er.event_id = ?
-    $limitClause
+    $limitOffsetClause
 ";
 
-$stmt = ($page_size === 0)
-    ? $eventConn->prepare($query)
-    : $eventConn->prepare($query);
-
-if ($page_size === 0) {
-    $stmt->bind_param("i", $event_id);
-} else {
-    $stmt->bind_param("iii", $event_id, $page_size, $offset);
-}
-
+$stmt = $eventConn->prepare($query);
+$stmt->bind_param("i", $event_id);
 $stmt->execute();
 $result = $stmt->get_result();
 
@@ -74,14 +92,41 @@ $data = [];
 while ($row = $result->fetch_assoc()) {
     $data[] = $row;
 }
-
 $stmt->close();
+
+// Fetch event industries (no pagination)
+$industriesQuery = "
+    SELECT 
+        ei.id, ei.event_id, ei.name, ei.category_id, ec.name AS category_name,
+        ei.printing_category, ei.unique_value, 
+        ei.added_by, ei.status, ei.is_deleted, ei.created_at, ei.modified_at 
+    FROM {$eventDb}.event_industries ei
+    LEFT JOIN {$eventDb}.event_categories ec ON ei.category_id = ec.id
+    WHERE ei.is_deleted = 0 AND ei.event_id = ?
+";
+
+$industriesStmt = $eventConn->prepare($industriesQuery);
+$industriesStmt->bind_param("i", $event_id);
+$industriesStmt->execute();
+$industriesResult = $industriesStmt->get_result();
+
+$eventIndustries = [];
+while ($row = $industriesResult->fetch_assoc()) {
+    $eventIndustries[] = $row;
+}
+$industriesStmt->close();
+
+// Close DB connection
 $eventConn->close();
 
+// Return JSON response
 echo json_encode([
     'success' => true,
-    'total_count' => $totalCount,
+    'total_count' => $registeredCount + $industriesCount,
+    'registered_count' => $registeredCount,
+    'industries_count' => $industriesCount,
     'page' => $page,
     'page_size' => $page_size,
-    'data' => $data
+    'data' => $data,
+    'event_industries' => $eventIndustries
 ]);
