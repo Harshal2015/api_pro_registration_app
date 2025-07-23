@@ -2,62 +2,86 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
-require_once 'config.php';  
-require_once 'connect_event_database.php';
+require_once 'config.php';          // $conn = main DB connection
+require_once 'connect_event_database.php'; 
 require_once 'tables.php';
 require_once 'auth_api.php';
+
 $input = json_decode(file_get_contents('php://input'), true);
+
 $name = trim($input['name'] ?? '');
 $email = trim($input['email'] ?? '');
 $phone = trim($input['phone'] ?? '');
 $onlyEventRegistrations = $input['only_event_registrations'] ?? false;
+$eventId = intval($input['eventId'] ?? 0);
 
-if (!$email && !$phone && !$name) {
+if ($eventId <= 0) {
+    echo json_encode(['success' => false, 'message' => 'Valid event ID is required']);
+    exit;
+}
+
+if (!$name && !$email && !$phone) {
     echo json_encode(['success' => false, 'message' => 'Provide name, email, or phone']);
     exit;
 }
+
+// Map event ID to event short name from main DB
+$eventShortName = '';
+$stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ? LIMIT 1");
+$stmt->bind_param('i', $eventId);
+$stmt->execute();
+$stmt->bind_result($shortNameResult);
+if ($stmt->fetch()) {
+    $eventShortName = $shortNameResult;
+}
+$stmt->close();
+
+if (!$eventShortName) {
+    echo json_encode(['success' => false, 'message' => 'Event not found']);
+    exit;
+}
+
+// Escape LIKE wildcards for safe LIKE queries
+function esc($str) {
+    return str_replace(['%', '_'], ['\%', '\_'], $str);
+}
+
+// --- Step 1: Query attendees FROM MAIN DATABASE (attendees table is here) ---
 
 $where = [];
 $params = [];
 $types = '';
 
-function esc($str) {
-    return str_replace(['%', '_'], ['\%', '\_'], $str);
-}
-
 if ($name) {
-    $where[] = "(first_name LIKE ? OR secondary_email LIKE ?)";
-    $likeName = '%' . esc($name) . '%';
-    $params[] = $likeName;
-    $params[] = $likeName;
+    $where[] = "(first_name LIKE ? OR last_name LIKE ?)";
+    $like = '%' . esc($name) . '%';
+    $params[] = $like;
+    $params[] = $like;
     $types .= 'ss';
 }
 if ($email) {
     $where[] = "(primary_email_address LIKE ? OR secondary_email LIKE ?)";
-    $likeEmail = '%' . esc($email) . '%';
-    $params[] = $likeEmail;
-    $params[] = $likeEmail;
+    $like = '%' . esc($email) . '%';
+    $params[] = $like;
+    $params[] = $like;
     $types .= 'ss';
 }
 if ($phone) {
     $where[] = "(primary_phone_number LIKE ? OR secondary_mobile_number LIKE ?)";
-    $likePhone = '%' . esc($phone) . '%';
-    $params[] = $likePhone;
-    $params[] = $likePhone;
+    $like = '%' . esc($phone) . '%';
+    $params[] = $like;
+    $params[] = $like;
     $types .= 'ss';
 }
 
-$whereSql = count($where) > 0 ? '(' . implode(' OR ', $where) . ") AND is_deleted = 0" : 'is_deleted = 0';
+$whereSql = $where ? '(' . implode(' OR ', $where) . ') AND is_deleted = 0' : 'is_deleted = 0';
 
-$sql = "SELECT 
-    id, unique_id, prefix, first_name, last_name, short_name,
-    primary_email_address, primary_email_address_verified, secondary_email,
-    country_code, primary_phone_number, primary_phone_number_verified,
-    secondary_mobile_number, city, state, country, pincode,
-    profession, workplace_name, designation, professional_registration_number,
-    registration_state, registration_type, added_by, area_of_interest,
-    is_verified, profile_photo, birth_date, bio,
-    is_deleted, created_at, modified_at
+$sql = "SELECT
+    id, prefix, first_name, last_name,
+    primary_email_address, secondary_email,
+    country_code, primary_phone_number, secondary_mobile_number,
+    city, state, country, pincode, profession,
+    workplace_name, designation
 FROM " . TABLE_ATTENDEES . "
 WHERE $whereSql
 LIMIT 50";
@@ -67,75 +91,101 @@ if ($types) {
     $stmt->bind_param($types, ...$params);
 }
 $stmt->execute();
-$result = $stmt->get_result();
-$attendees = $result->fetch_all(MYSQLI_ASSOC);
+$attendees = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-if (!$attendees) {
-    echo json_encode(['success' => true, 'attendees' => []]);
+// Initialize registrations for attendees
+foreach ($attendees as &$att) {
+    $att['registrations'] = [];
+}
+
+// --- Step 2: Connect to EVENT-SPECIFIC database using short name ---
+$res = connectEventDbByShortName($eventShortName);
+if (!$res['success']) {
+    echo json_encode(['success' => false, 'message' => 'Could not connect to event database']);
     exit;
 }
+$edb = $res['conn'];
 
-$eventDbsResult = $conn->query("SHOW DATABASES LIKE 'prop_propass_event_%'");
-$eventDbs = [];
-while ($row = $eventDbsResult->fetch_row()) {
-    $eventDbs[] = $row[0];
-}
-
-$registrationsMap = [];
+// --- Step 3: Fetch registrations for attendee IDs from event DB ---
 $ids = array_column($attendees, 'id');
-$in = implode(',', array_map('intval', $ids));
+if (count($ids) > 0) {
+    $inClause = implode(',', array_map('intval', $ids));
 
-if (!$in) {
-    echo json_encode(['success' => true, 'attendees' => $attendees]);
-    exit;
-}
-
-foreach ($eventDbs as $eventDbName) {
-    $shortName = str_replace('prop_propass_event_', '', $eventDbName);
-    $eventConnResult = connectEventDbByShortName($shortName);
-    if (!$eventConnResult['success']) continue;
-
-    $eventConn = $eventConnResult['conn'];
-
-    $sqlCheck = "
-        SELECT 
-            er.id AS event_registration_id,
-            er.user_id,
-            ec.name AS category_name
+    $q1 = "
+        SELECT er.user_id, er.id AS event_reg_id, ec.name AS category_name
         FROM event_registrations er
-        LEFT JOIN event_categories ec ON er.category_id = ec.id
-        WHERE er.user_id IN ($in) AND er.is_deleted = 0
-    ";
+        JOIN event_categories ec ON er.category_id = ec.id
+        WHERE er.user_id IN ($inClause) AND er.is_deleted = 0";
 
-    $result = $eventConn->query($sqlCheck);
-
-    if ($result && $result->num_rows > 0) {
-        while ($row = $result->fetch_assoc()) {
-            $userId = $row['user_id'];
-            $registrationsMap[$userId][] = [
-                'event' => $shortName,
-                'category_name' => $row['category_name'] ?? 'General',
-                'event_registration_id' => $row['event_registration_id'] ?? null
-            ];
-        }
+    $r1 = $edb->query($q1);
+    $registrations = [];
+    while ($r = $r1->fetch_assoc()) {
+        $registrations[$r['user_id']][] = [
+            'event' => $eventShortName,
+            'category_name' => $r['category_name'],
+            'event_registration_id' => $r['event_reg_id'],
+        ];
     }
 
-    $eventConn->close();
-}
-
-$filteredAttendees = [];
-foreach ($attendees as &$attendee) {
-    $attendee['registered_events'] = $registrationsMap[$attendee['id']] ?? [];
-
-    if (!empty($attendee['registered_events'])) {
-        $attendee['category_name'] = $attendee['registered_events'][0]['category_name'] ?? 'General';
-        $attendee['event_registration_id'] = $attendee['registered_events'][0]['event_registration_id'] ?? null;
-    }
-
-    if (!$onlyEventRegistrations || !empty($attendee['registered_events'])) {
-        $filteredAttendees[] = $attendee;
+    foreach ($attendees as &$att) {
+        $uid = $att['id'];
+        $att['registrations'] = $registrations[$uid] ?? [];
     }
 }
 
-echo json_encode(['success' => true, 'attendees' => $filteredAttendees]);
+// --- Step 4: Fetch industries matching search term in event DB ---
+$industrySearchTerm = $name ?: $email ?: $phone;
+$industries = [];
+
+if ($industrySearchTerm) {
+    $searchEsc = esc($industrySearchTerm);
+    $q2 = "
+        SELECT 
+            ei.id,
+            ei.name,
+            ec.name AS category_name,
+            ei.printing_category
+        FROM event_industries ei
+        LEFT JOIN event_categories ec ON ei.category_id = ec.id
+        WHERE (ei.name LIKE '%$searchEsc%' OR ei.printing_category LIKE '%$searchEsc%')
+          AND ei.is_deleted = 0
+        LIMIT 50";
+
+    $r2 = $edb->query($q2);
+    while ($r = $r2->fetch_assoc()) {
+        $industries[] = [
+            'type' => 'industry',
+            'event' => $eventShortName,
+            'industry' => [
+                'id' => $r['id'],
+                'name' => $r['name'],
+                'category_name' => $r['category_name'],
+                'printing_category' => $r['printing_category'],
+            ],
+        ];
+    }
+}
+
+$edb->close();
+
+// --- Step 5: Filter attendees by registration if requested ---
+if ($onlyEventRegistrations) {
+    $attendees = array_filter($attendees, fn($a) => count($a['registrations']) > 0);
+}
+
+// --- Step 6: Add type to attendees and clean data ---
+foreach ($attendees as &$att) {
+    $att['type'] = 'attendee';
+    $att['registered_events'] = $att['registrations'];
+    unset($att['registrations']);
+}
+
+// --- Step 7: Merge attendees + industries and output JSON ---
+$finalResults = array_merge($attendees, $industries);
+
+echo json_encode([
+    'success' => true,
+    'results' => array_values($finalResults),
+]);
+exit;
