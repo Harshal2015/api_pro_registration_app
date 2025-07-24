@@ -1,32 +1,48 @@
 <?php
 header("Content-Type: application/json");
 date_default_timezone_set('Asia/Kolkata');
-require_once 'auth_api.php';
 
-require_once 'config.php';           
-require_once 'connect_event_database.php'; 
+require_once 'auth_api.php';
+require_once 'config.php';
+require_once 'connect_event_database.php';
 require_once 'tables.php';
 
 try {
-         $input = json_decode(file_get_contents("php://input"), true);
+    // Read and decode raw input
+    $rawInput = file_get_contents("php://input");
+    $input = json_decode($rawInput, true);
 
-    $event_id = $_GET['event_id'] ?? $input['event_id'] ?? null;
-    if (!$event_id) throw new Exception("Missing event_id");
+    // Log input for debugging (optional: remove in production)
+    file_put_contents('badge_log_debug.txt', print_r([
+        'timestamp' => date('Y-m-d H:i:s'),
+        'raw_input' => $rawInput,
+        'parsed_input' => $input,
+        'GET' => $_GET,
+    ], true), FILE_APPEND);
 
+    // Get event_id safely
+    $event_id = $_GET['event_id'] ?? ($input['event_id'] ?? null);
+    if (!$event_id || !is_numeric($event_id)) {
+        throw new Exception("Missing or invalid event_id");
+    }
+    $event_id = (int)$event_id;
+
+    // Get event short name
     $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
     $stmt->bind_param("i", $event_id);
     $stmt->execute();
     $result = $stmt->get_result();
     if ($result->num_rows === 0) throw new Exception("Event not found");
-
-    $event = $result->fetch_assoc();
-    $short = strtolower($event['short_name']);
+    $short = strtolower($result->fetch_assoc()['short_name']);
     $stmt->close();
 
+    // Connect to event DB
     $eventResult = connectEventDb($event_id);
     if (!$eventResult['success']) throw new Exception($eventResult['message']);
     $eventConn = $eventResult['conn'];
 
+    // Fetch scan logs
+    $scanMap = [];
     $scanStmt = $eventConn->prepare("
         SELECT user_id, registration_id, print_type, date, time
         FROM event_scan_logg
@@ -36,12 +52,10 @@ try {
     $scanStmt->bind_param("i", $event_id);
     $scanStmt->execute();
     $scanResult = $scanStmt->get_result();
-
-    $scanMap = [];
-    while ($s = $scanResult->fetch_assoc()) {
-        $key = $s['user_id'] . ':' . $s['registration_id'];
-        $dt = $s['date'] . ' ' . $s['time'];
-        $ptype = strtolower($s['print_type']);
+    while ($row = $scanResult->fetch_assoc()) {
+        $key = "{$row['user_id']}:{$row['registration_id']}";
+        $dt = "{$row['date']} {$row['time']}";
+        $ptype = strtolower($row['print_type']);
 
         if (!isset($scanMap[$key])) {
             $scanMap[$key] = ['issued' => null, 'reissued' => []];
@@ -57,6 +71,9 @@ try {
     }
     $scanStmt->close();
 
+    // Fetch attendees
+    $attendeeRegs = [];
+    $userIds = [];
     $regStmt = $eventConn->prepare("
         SELECT er.user_id, er.id AS registration_id, ec.name AS category_name
         FROM event_registrations er
@@ -66,18 +83,33 @@ try {
     $regStmt->bind_param("i", $event_id);
     $regStmt->execute();
     $regResult = $regStmt->get_result();
-
-    $registrations = [];
-    $userIds = [];
     while ($reg = $regResult->fetch_assoc()) {
-        $registrations[] = $reg;
+        $attendeeRegs[] = $reg;
         $userIds[] = $reg['user_id'];
     }
     $regStmt->close();
 
-    $userIds = array_unique($userIds);
-    $attendees = [];
+    // Fetch industry regs
+    $industryRegs = [];
+    $indStmt = $eventConn->prepare("
+        SELECT id AS registration_id, name AS category_name
+        FROM event_industries
+        WHERE event_id = ? AND is_deleted = 0
+    ");
+    $indStmt->bind_param("i", $event_id);
+    $indStmt->execute();
+    $indResult = $indStmt->get_result();
+    while ($ind = $indResult->fetch_assoc()) {
+        $industryRegs[] = [
+            'user_id' => 0,
+            'registration_id' => $ind['registration_id'],
+            'category_name' => $ind['category_name']
+        ];
+    }
+    $indStmt->close();
 
+    // Fetch attendee names
+    $attendees = [];
     if (!empty($userIds)) {
         $placeholders = implode(',', array_fill(0, count($userIds), '?'));
         $types = str_repeat('i', count($userIds));
@@ -95,84 +127,84 @@ try {
         $attStmt->close();
     }
 
-    $report = [];
-    foreach ($registrations as $reg) {
-        $key = $reg['user_id'] . ':' . $reg['registration_id'];
-        $attendeeName = 'Unknown Attendee';
+    // Initialize reports
+    $attendeeReport = [];
+    $industryReport = [];
+    $stats = [
+        'attendees' => ['total' => 0, 'collected' => 0, 'reissued' => 0, 'not_collected' => 0],
+        'industries' => ['total' => 0, 'collected' => 0, 'reissued' => 0, 'not_collected' => 0]
+    ];
 
-        if (isset($attendees[$reg['user_id']])) {
-            $att = $attendees[$reg['user_id']];
-            $prefix = trim($att['prefix'] ?? '');
-            $firstName = trim($att['first_name'] ?? '');
-            $lastName = trim($att['last_name'] ?? '');
-            $shortName = trim($att['short_name'] ?? '');
+    // Build entry function
+    function buildEntries($reg, $attendees, $scanMap, &$reportArray, &$statArray) {
+        $key = "{$reg['user_id']}:{$reg['registration_id']}";
+        $statArray['total']++;
 
-            $fullName = trim("$prefix $firstName $lastName");
-            if ($shortName !== '') {
-                $attendeeName = trim("$prefix $shortName");
-            } else {
-                $attendeeName = $fullName;
-            }
-
-            if ($attendeeName === '') {
-                $attendeeName = 'Unknown Attendee';
-            }
-        }
-
-        $statusEntries = [];
+        $entries = [];
 
         if (!empty($scanMap[$key]['issued'])) {
-            $statusEntries[] = $scanMap[$key]['issued'];
+            $entries[] = $scanMap[$key]['issued'];
+        }
+        foreach ($scanMap[$key]['reissued'] ?? [] as $r) {
+            $entries[] = $r;
+        }
+        if (empty($entries)) {
+            $entries[] = ['status' => 'Not Collected', 'date_time' => null];
         }
 
-        foreach ($scanMap[$key]['reissued'] ?? [] as $re) {
-            $statusEntries[] = $re;
+        // Name logic
+        $name = 'Industry Participant';
+        if ($reg['user_id'] != 0 && isset($attendees[$reg['user_id']])) {
+            $a = $attendees[$reg['user_id']];
+            $name = trim(($a['prefix'] ?? '') . ' ' . (($a['short_name']) ? $a['short_name'] : ($a['first_name'] . ' ' . $a['last_name'])));
+            if ($name === '') $name = 'Unknown Attendee';
         }
 
-        if (empty($statusEntries)) {
-            $statusEntries[] = ['status' => 'Not Collected', 'date_time' => null];
-        }
+        foreach ($entries as $entry) {
+            $status = $entry['status'];
+            if ($status === 'Collected') $statArray['collected']++;
+            if ($status === 'Reissued') $statArray['reissued']++;
+            if ($status === 'Not Collected') $statArray['not_collected']++;
 
-        foreach ($statusEntries as $entry) {
-            $report[] = [
-                'user_id'       => $reg['user_id'],
-                'registration_id'   => $reg['registration_id'],
-                'attendee_name' => $attendeeName,
-                'category_name' => $reg['category_name'] ?? 'Unknown Category',
-                'status'        => $entry['status'],
-                'collected_at'  => $entry['date_time'],
+            $reportArray[] = [
+                'user_id'         => $reg['user_id'],
+                'registration_id' => $reg['registration_id'],
+                'name'            => $name,
+                'category_name'   => $reg['category_name'] ?? 'Unknown Category',
+                'status'          => $status,
+                'collected_at'    => $entry['date_time']
             ];
         }
     }
 
-    $total = count($registrations);
-    $collectedKeys = [];
-    $totalReissued = 0;
-
-    foreach ($report as $row) {
-        $key = $row['user_id'] . ':' . $row['registration_id'];
-        if ($row['status'] !== 'Not Collected') {
-            $collectedKeys[$key] = true;
-        }
-        if ($row['status'] === 'Reissued') {
-            $totalReissued++;
-        }
+    // Build reports
+    foreach ($attendeeRegs as $reg) {
+        buildEntries($reg, $attendees, $scanMap, $attendeeReport, $stats['attendees']);
+    }
+    foreach ($industryRegs as $reg) {
+        buildEntries($reg, [], $scanMap, $industryReport, $stats['industries']);
     }
 
-    $totalCollected = count($collectedKeys);
-    $totalNotCollected = $total - $totalCollected;
+    // Final totals
+    $combined = [
+        'total' => $stats['attendees']['total'] + $stats['industries']['total'],
+        'collected' => $stats['attendees']['collected'] + $stats['industries']['collected'],
+        'reissued' => $stats['attendees']['reissued'] + $stats['industries']['reissued'],
+        'not_collected' => $stats['attendees']['not_collected'] + $stats['industries']['not_collected']
+    ];
 
+    // Return JSON response
     echo json_encode([
-        'event_id'            => $event_id,
-        'short_name'          => $short,
-        'total'               => $total,
-        'total_collected'     => $totalCollected,
-        'total_reissued'      => $totalReissued,
-        'total_not_collected' => $totalNotCollected,
-        'report'              => $report,
+        'event_id' => $event_id,
+        'short_name' => $short,
+        'stats' => $stats,
+        'combined_totals' => $combined,
+        'attendee_report' => $attendeeReport,
+        'industry_report' => $industryReport
     ], JSON_PRETTY_PRINT);
 
 } catch (Exception $e) {
+    error_log("Error: " . $e->getMessage());
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
 }
