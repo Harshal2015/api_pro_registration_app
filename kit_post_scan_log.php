@@ -20,20 +20,22 @@ try {
     $status          = $input['status'] ?? 1;
     $is_deleted      = $input['is_deleted'] ?? 0;
 
+    // Validate required fields
     if (!$event_id || !$registration_id || $user_id === null || !$app_user_id) {
         throw new Exception("Missing required fields: event_id, user_id, registration_id, or app_user_id");
     }
 
+    // Connect to the event database
     $eventResult = connectEventDb($event_id);
     if (!$eventResult['success']) {
         throw new Exception($eventResult['message']);
     }
     $eventConn = $eventResult['conn'];
 
+    // Step 1: Validate registration/industry ID and get category_id
     $isIndustry = ($user_id == 0);
     $category_id = null;
 
-    // Step 1: Validate registration/industry ID and get category_id
     if ($isIndustry) {
         $stmt = $eventConn->prepare("
             SELECT category_id FROM event_industries
