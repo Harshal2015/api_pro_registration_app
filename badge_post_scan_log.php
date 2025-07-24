@@ -49,11 +49,25 @@ try {
         $industryCheckStmt->close();
 
         if (!$industry) {
-            throw new Exception("Invalid industry ID: $registration_id for event $event_id");
+            throw new Exception("QR not valid for this event. Invalid industry ID: $registration_id for event $event_id");
         }
+
     } else {
-        // Check registration exists (you can extend this if needed)
-        // Optional: validate category_id == "industry" here if needed
+        // Check if user registration belongs to this event
+        $registrationCheckStmt = $eventConn->prepare("
+            SELECT user_id FROM event_registrations
+            WHERE event_id = ? AND id = ? AND user_id = ? AND is_deleted = 0
+            LIMIT 1
+        ");
+        $registrationCheckStmt->bind_param("iii", $event_id, $registration_id, $user_id);
+        $registrationCheckStmt->execute();
+        $registrationResult = $registrationCheckStmt->get_result();
+        $registration = $registrationResult->fetch_assoc();
+        $registrationCheckStmt->close();
+
+        if (!$registration) {
+            throw new Exception("QR not valid for this event. Invalid registration ID: $registration_id for event $event_id");
+        }
     }
 
     // Prevent duplicate scan unless it's a reissue
