@@ -45,7 +45,7 @@ try {
     $scan_for = null;
 
     // Lunch: 10:00 (600) to 16:00 (960)
-    if ($currentMinutes >= 600 && $currentMinutes <= 960) {
+    if ($currentMinutes >= 600 && $currentMinutes <= 1080) {
         $scan_for = 'Lunch';
     }
     // Dinner: 18:00 (1080) to 23:59 (1439) OR 00:00 (0) to 03:00 (180)

@@ -9,6 +9,7 @@ ini_set('display_errors', 1);
 require_once 'config.php';
 require_once 'connect_event_database.php';
 require_once 'tables.php';
+require_once 'auth_api.php';
 
 
 try {
