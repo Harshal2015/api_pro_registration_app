@@ -36,46 +36,24 @@ try {
     // Determine if this is a Master QR scan
     $isMasterQR = ($user_id == 0 && $registration_id == 0);
 
-    // Get scan_for time (Lunch or Dinner)
+    // Determine scan_for based on time
+
     $currentTime = date('H:i:s');
-    $scan_for = (strtotime($currentTime) >= strtotime('11:00:00') && strtotime($currentTime) <= strtotime('16:59:59')) ? 'Lunch' : 'Dinner';
+    list($h, $m, $s) = explode(':', $currentTime);
+    $currentMinutes = intval($h) * 60 + intval($m);
 
-    // If Master QR, skip permission checks and log directly
-    // Connect to the event database (do this before Master QR handling)
-$eventResult = connectEventDb($event_id);
-if (!$eventResult['success']) {
-    throw new Exception($eventResult['message']);
-}
-$eventConn = $eventResult['conn'];
+    $scan_for = null;
 
-// If Master QR, skip permission checks and log directly
-if ($isMasterQR) {
-   // Use eventConn here
-$insertStmt = $eventConn->prepare("
-    INSERT INTO event_scan_logs_food (
-        event_id, app_user_id, user_id, registration_id,
-        date, time, print_type, status, is_deleted, scan_for,
-        created_at, updated_at
-    ) VALUES (?, ?, ?, ?, CURDATE(), CURTIME(), ?, 1, 0, ?, NOW(), NOW())
-");
-
-    $insertStmt->bind_param(
-        "iiiiss",
-        $event_id, $app_user_id, $user_id, $registration_id,
-        $print_type, $scan_for
-    );
-    $insertStmt->execute();
-    $insertStmt->close();
-
-    echo json_encode([
-        'success' => true,
-        'message' => "Master QR logged successfully as $print_type for $scan_for.",
-        'print_type' => $print_type,
-        'scan_for' => $scan_for
-    ]);
-    exit;
-}
-
+    // Lunch: 10:00 (600) to 16:00 (960)
+    if ($currentMinutes >= 600 && $currentMinutes <= 960) {
+        $scan_for = 'Lunch';
+    }
+    // Dinner: 18:00 (1080) to 23:59 (1439) OR 00:00 (0) to 03:00 (180)
+    elseif (($currentMinutes >= 1080 && $currentMinutes <= 1439) || ($currentMinutes >= 0 && $currentMinutes <= 180)) {
+        $scan_for = 'Dinner';
+    } else {
+        throw new Exception("Scan time outside Lunch and Dinner windows.");
+    }
 
     // Connect to the event database
     $eventResult = connectEventDb($event_id);
@@ -83,6 +61,33 @@ $insertStmt = $eventConn->prepare("
         throw new Exception($eventResult['message']);
     }
     $eventConn = $eventResult['conn'];
+
+    // If Master QR, skip permission checks and log directly
+    if ($isMasterQR) {
+        $insertStmt = $eventConn->prepare("
+            INSERT INTO event_scan_logs_food (
+                event_id, app_user_id, user_id, registration_id,
+                date, time, print_type, status, is_deleted, scan_for,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, CURDATE(), CURTIME(), ?, 1, 0, ?, NOW(), NOW())
+        ");
+
+        $insertStmt->bind_param(
+            "iiiiss",
+            $event_id, $app_user_id, $user_id, $registration_id,
+            $print_type, $scan_for
+        );
+        $insertStmt->execute();
+        $insertStmt->close();
+
+        echo json_encode([
+            'success' => true,
+            'message' => "Master QR logged successfully as $print_type for $scan_for.",
+            'print_type' => $print_type,
+            'scan_for' => $scan_for
+        ]);
+        exit;
+    }
 
     $isIndustry = ($user_id == 0);
     $hasLunch = 0;
