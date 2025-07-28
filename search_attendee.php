@@ -143,7 +143,7 @@ if ($industrySearchTerm) {
     $q2 = "
         SELECT 
             ei.id,
-            ei.name,
+            ei.name,ei.unique_value,
             ec.name AS category_name,
             ei.printing_category
         FROM event_industries ei
@@ -161,6 +161,7 @@ if ($industrySearchTerm) {
                 'id' => $r['id'],
                 'name' => $r['name'],
                 'category_name' => $r['category_name'],
+                'unique_value' => $r['unique_value'],
                 'printing_category' => $r['printing_category'],
             ],
         ];

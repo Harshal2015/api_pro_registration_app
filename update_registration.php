@@ -2,114 +2,186 @@
 header("Content-Type: application/json");
 date_default_timezone_set('Asia/Kolkata');
 
-// Include the auth API — it validates and either ends execution or allows continuation
 require_once 'auth_api.php';
-
-// Now your usual includes for DB connection and constants
-require_once 'config.php';               // provides $conn connected to main DB
-require_once 'connect_event_database.php'; // provides connectEventDb($event_id)
+require_once 'config.php';
+require_once 'connect_event_database.php';
 require_once 'tables.php';
 
 try {
-    // Since auth_api.php reads JSON from php://input, 
-    // you should do the same here:
     $input = json_decode(file_get_contents("php://input"), true);
 
     $event_id    = $input['event_id'] ?? null;
-    $user_id     = $input['user_id'] ?? null;
+    $user_id     = $input['user_id'] ?? null;  // user_id for attendee update
     $category_id = $input['category_id'] ?? null;
 
-    // Attendee (main DB) update data
+    // Industry input
+    $industry_name = trim($input['name'] ?? '');
+    // Accept industry ID from either "industry_id" or "id"
+    $industry_id_input = $input['id'] ?? ($input['id'] ?? null);
+
+    // Attendee input
     $prefix            = $input['prefix'] ?? null;
-    $first_name        = $input['first_name'] ?? '';
-    $last_name         = $input['last_name'] ?? '';
-    $phone             = $input['primary_phone_number'] ?? '';
-    $email             = $input['primary_email_address'] ?? '';
-    $city              = $input['city'] ?? '';
-    $state             = $input['state'] ?? '';
-    $country           = $input['country'] ?? '';
-    $mci_number        = $input['professional_registration_number'] ?? '';
-    $registration_type = $input['registration_type'] ?? '';
-    $profession        = $input['profession'] ?? '';
-    $added_by          = $input['added_by'] ?? '';
+    $first_name        = trim($input['first_name'] ?? '');
+    $last_name         = trim($input['last_name'] ?? '');
+    $phone             = trim($input['primary_phone_number'] ?? '');
+    $email             = trim($input['primary_email_address'] ?? '');
+    $city              = trim($input['city'] ?? '');
+    $state             = trim($input['state'] ?? '');
+    $country           = trim($input['country'] ?? '');
+    $mci_number        = trim($input['professional_registration_number'] ?? '');
+    $registration_type = trim($input['registration_type'] ?? '');
+    $profession        = trim($input['profession'] ?? '');
+    $added_by          = trim($input['added_by'] ?? '');
 
-    if (!$event_id || !$user_id) {
-        throw new Exception("Missing required fields: event_id or user_id");
+    if (!$event_id || !$category_id) {
+        throw new Exception("Missing required fields: event_id or category_id");
     }
 
-    // Step 1: Connect to event-specific database
-    $connectionResult = connectEventDb($event_id);
-    if (!$connectionResult['success']) {
-        throw new Exception($connectionResult['message']);
+    // Connect to event-specific DB
+    $eventResult = connectEventDb($event_id);
+    if (!$eventResult['success']) {
+        throw new Exception($eventResult['message']);
     }
-    $eventConn = $connectionResult['conn'];
-
-    // Step 2: Use existing connection from config.php to main DB
+    $eventConn = $eventResult['conn'];
     $mainConn = $conn;
 
-    // Step 3: Check for changes in the event_registration table (event DB)
-    $checkReg = $eventConn->prepare("SELECT category_id FROM event_registrations WHERE event_id = ? AND user_id = ?");
+    // Check if the category is industry by checking if an industry record exists for event+category
+    $catTypeStmt = $eventConn->prepare("
+        SELECT id FROM event_industries 
+        WHERE event_id = ? AND category_id = ? 
+        LIMIT 1
+    ");
+    $catTypeStmt->bind_param("ii", $event_id, $category_id);
+    $catTypeStmt->execute();
+    $catRes = $catTypeStmt->get_result();
+    $isIndustry = $catRes->num_rows > 0;
+    $catTypeStmt->close();
+
+    if ($isIndustry) {
+        if (empty($industry_name)) {
+            throw new Exception("Industry name is required.");
+        }
+
+        if ($industry_id_input) {
+            $id = intval($industry_id_input);
+
+            // Verify industry_id exists and belongs to this event and category
+            $verifyStmt = $eventConn->prepare("
+                SELECT id FROM event_industries 
+                WHERE id = ? AND event_id = ? AND category_id = ? LIMIT 1
+            ");
+            $verifyStmt->bind_param("iii", $id, $event_id, $category_id);
+            $verifyStmt->execute();
+            $verifyRes = $verifyStmt->get_result();
+            $industry = $verifyRes->fetch_assoc();
+            $verifyStmt->close();
+
+            if (!$industry) {
+                throw new Exception("Invalid id for this event and category.");
+            }
+        } else {
+            // Get industry ID from event_industries by event + category
+            $getIndustry = $eventConn->prepare("
+                SELECT id FROM event_industries 
+                WHERE event_id = ? AND category_id = ? 
+                LIMIT 1
+            ");
+            $getIndustry->bind_param("ii", $event_id, $category_id);
+            $getIndustry->execute();
+            $resIndustry = $getIndustry->get_result();
+            $industry = $resIndustry->fetch_assoc();
+            $getIndustry->close();
+
+            if (!$industry) {
+                throw new Exception("Industry record not found for this event and category.");
+            }
+            $id = $industry['id'];
+        }
+
+        // DEBUG: log industry ID we will update
+        error_log("Updating industry ID: " . $id);
+
+        // Update industry name
+        $updInd = $eventConn->prepare("
+            UPDATE event_industries 
+            SET name = ?, modified_at = NOW()
+            WHERE id = ?
+        ");
+        $updInd->bind_param("si", $industry_name, $id);
+        $updInd->execute();
+        $updInd->close();
+
+        echo json_encode([
+            'success' => true,
+            'message' => 'Industry name updated successfully.',
+            'industry_id_updated' => $id
+        ]);
+        exit;
+    }
+
+    // If not industry, proceed to attendee update
+    if (!$user_id) {
+        throw new Exception("Missing user_id for attendee update.");
+    }
+
+    // Update event_registrations category if changed
+    $checkReg = $eventConn->prepare("
+        SELECT category_id FROM event_registrations WHERE event_id = ? AND user_id = ?
+    ");
     $checkReg->bind_param("ii", $event_id, $user_id);
     $checkReg->execute();
-    $resultReg = $checkReg->get_result();
-    $regData = $resultReg->fetch_assoc();
+    $regRes = $checkReg->get_result();
+    $reg = $regRes->fetch_assoc();
     $checkReg->close();
 
-    if ($regData && $regData['category_id'] != $category_id) {
-        $updateReg = $eventConn->prepare("
-            UPDATE event_registrations
+    if ($reg && $reg['category_id'] != $category_id) {
+        $updReg = $eventConn->prepare("
+            UPDATE event_registrations 
             SET category_id = ?, modified_at = NOW()
             WHERE event_id = ? AND user_id = ?
         ");
-        $updateReg->bind_param("iii", $category_id, $event_id, $user_id);
-        $updateReg->execute();
-        $updateReg->close();
+        $updReg->bind_param("iii", $category_id, $event_id, $user_id);
+        $updReg->execute();
+        $updReg->close();
     }
 
-    // Step 4: Check and update attendees_1 table in main DB
-    $checkAttendee = $mainConn->prepare("SELECT * FROM " . TABLE_ATTENDEES . " WHERE id = ?");
-    $checkAttendee->bind_param("i", $user_id);
-    $checkAttendee->execute();
-    $attendeeResult = $checkAttendee->get_result();
-    $attendee = $attendeeResult->fetch_assoc();
-    $checkAttendee->close();
+    // Check attendee in main DB
+    $chkAtt = $mainConn->prepare("SELECT * FROM " . TABLE_ATTENDEES . " WHERE id = ?");
+    $chkAtt->bind_param("i", $user_id);
+    $chkAtt->execute();
+    $attRes = $chkAtt->get_result();
+    $att = $attRes->fetch_assoc();
+    $chkAtt->close();
 
-    if ($attendee) {
-        // Use new values if provided, else keep old ones
-        $prefix            = $prefix ?? $attendee['prefix'];
-        $first_name        = $first_name ?: $attendee['first_name'];
-        $last_name         = $last_name ?: $attendee['last_name'];
-        $phone             = $phone ?: $attendee['primary_phone_number'];
-        $email             = $email ?: $attendee['primary_email_address'];
-        $city              = $city ?: $attendee['city'];
-        $state             = $state ?: $attendee['state'];
-        $country           = $country ?: $attendee['country'];
-        $mci_number        = $mci_number ?: $attendee['professional_registration_number'];
-        $registration_type = $registration_type ?: $attendee['registration_type'];
-        $profession        = $profession ?: $attendee['profession'];
-        $added_by          = $added_by ?: $attendee['added_by'];
+    if ($att) {
+        $newShort = trim($first_name . ' ' . $last_name);
 
-        // Compose short_name (full name)
-        $newShortname = trim($first_name . ' ' . $last_name);
+        $fields = [
+            'prefix' => $prefix ?? $att['prefix'],
+            'first_name' => $first_name ?: $att['first_name'],
+            'last_name' => $last_name ?: $att['last_name'],
+            'primary_phone_number' => $phone ?: $att['primary_phone_number'],
+            'primary_email_address' => $email ?: $att['primary_email_address'],
+            'city' => $city ?: $att['city'],
+            'state' => $state ?: $att['state'],
+            'country' => $country ?: $att['country'],
+            'professional_registration_number' => $mci_number ?: $att['professional_registration_number'],
+            'registration_type' => $registration_type ?: $att['registration_type'],
+            'profession' => $profession ?: $att['profession'],
+            'added_by' => $added_by ?: $att['added_by'],
+            'short_name' => $newShort ?: $att['short_name']
+        ];
 
-        // Now check if anything changed
-        $needsUpdate = (
-            $attendee['prefix'] !== $prefix ||
-            $attendee['first_name'] !== $first_name ||
-            $attendee['last_name'] !== $last_name ||
-            $attendee['primary_phone_number'] !== $phone ||
-            $attendee['primary_email_address'] !== $email ||
-            $attendee['city'] !== $city ||
-            $attendee['state'] !== $state ||
-            $attendee['country'] !== $country ||
-            $attendee['professional_registration_number'] !== $mci_number ||
-            $attendee['registration_type'] !== $registration_type ||
-            $attendee['profession'] !== $profession ||
-            $attendee['short_name'] !== $newShortname
-        );
+        $needsUpdate = false;
+        foreach ($fields as $k => $v) {
+            if ($att[$k] !== $v) {
+                $needsUpdate = true;
+                break;
+            }
+        }
 
         if ($needsUpdate) {
-            $updateAttendee = $mainConn->prepare("
+            $updAtt = $mainConn->prepare("
                 UPDATE " . TABLE_ATTENDEES . "
                 SET prefix = ?, first_name = ?, last_name = ?, primary_phone_number = ?, 
                     primary_email_address = ?, city = ?, state = ?, country = ?, 
@@ -117,34 +189,31 @@ try {
                     profession = ?, added_by = ?, short_name = ?, modified_at = NOW()
                 WHERE id = ?
             ");
-
-            $updateAttendee->bind_param(
+            $updAtt->bind_param(
                 "sssssssssssssi",
-                $prefix,
-                $first_name,
-                $last_name,
-                $phone,
-                $email,
-                $city,
-                $state,
-                $country,
-                $mci_number,
-                $registration_type,
-                $profession,
-                $added_by,
-                $newShortname,
+                $fields['prefix'],
+                $fields['first_name'],
+                $fields['last_name'],
+                $fields['primary_phone_number'],
+                $fields['primary_email_address'],
+                $fields['city'],
+                $fields['state'],
+                $fields['country'],
+                $fields['professional_registration_number'],
+                $fields['registration_type'],
+                $fields['profession'],
+                $fields['added_by'],
+                $fields['short_name'],
                 $user_id
             );
-
-            $updateAttendee->execute();
-            $updateAttendee->close();
+            $updAtt->execute();
+            $updAtt->close();
         }
     }
 
-    // ✅ SUCCESS response
     echo json_encode([
         'success' => true,
-        'message' => 'Updated Successfully.'
+        'message' => 'Attendee updated successfully.'
     ]);
 
 } catch (Exception $e) {

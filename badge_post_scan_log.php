@@ -3,15 +3,15 @@ header("Content-Type: application/json");
 date_default_timezone_set('Asia/Kolkata');
 
 require_once 'auth_api.php';
-require_once 'config.php';               
-require_once 'connect_event_database.php';      
+require_once 'config.php';
+require_once 'connect_event_database.php';
 
 try {
     $input = json_decode(file_get_contents("php://input"), true);
 
     $event_id        = $input['event_id'] ?? null;
-    $user_id         = $input['user_id'] ?? null;
-    $registration_id = $input['registration_id'] ?? null;
+    $user_id         = $input['user_id'] ?? null; // can be uniqueValue (industry) or user_id
+    $registration_id = $input['registration_id'] ?? null; // can be industry.id or registration.id
     $app_user_id     = $input['app_user_id'] ?? null;
     $api_key         = $input['api_key'] ?? null;
 
@@ -26,6 +26,7 @@ try {
         throw new Exception("Missing required fields: event_id or registration_id");
     }
 
+    // Connect to event-specific database
     $connectionResult = connectEventDb($event_id);
     if (!$connectionResult['success']) {
         throw new Exception($connectionResult['message']);
@@ -34,26 +35,26 @@ try {
     /** @var mysqli $eventConn */
     $eventConn = $connectionResult['conn'];
 
-    $isIndustry = ($user_id == 0);
+    // 🔍 Detect whether it's an industry by checking event_industries
+    $industryCheckStmt = $eventConn->prepare("
+        SELECT id, unique_value FROM event_industries 
+        WHERE event_id = ? AND id = ? AND is_deleted = 0 
+        LIMIT 1
+    ");
+    $industryCheckStmt->bind_param("ii", $event_id, $registration_id);
+    $industryCheckStmt->execute();
+    $industryResult = $industryCheckStmt->get_result();
+    $industry = $industryResult->fetch_assoc();
+    $industryCheckStmt->close();
+
+    $isIndustry = $industry ? true : false;
 
     if ($isIndustry) {
-        $industryCheckStmt = $eventConn->prepare("
-            SELECT id FROM event_industries 
-            WHERE event_id = ? AND id = ? AND is_deleted = 0 
-            LIMIT 1
-        ");
-        $industryCheckStmt->bind_param("ii", $event_id, $registration_id);
-        $industryCheckStmt->execute();
-        $industryResult = $industryCheckStmt->get_result();
-        $industry = $industryResult->fetch_assoc();
-        $industryCheckStmt->close();
-
-        if (!$industry) {
-            throw new Exception("QR not valid for this event. Invalid industry ID: $registration_id for event $event_id");
-        }
-
+        // Industry ID already verified above
+        // Optional: You could override $user_id here using $industry['unique_value']
+        // Example: $user_id = $industry['unique_value'];
     } else {
-        // Check if user registration belongs to this event
+        // Not an industry, must be a regular user registration
         $registrationCheckStmt = $eventConn->prepare("
             SELECT user_id FROM event_registrations
             WHERE event_id = ? AND id = ? AND user_id = ? AND is_deleted = 0
@@ -70,7 +71,7 @@ try {
         }
     }
 
-    // Prevent duplicate scan unless it's a reissue
+    // 🔁 Check for duplicate scan unless Reissued
     $checkStmt = $eventConn->prepare("
         SELECT id FROM event_scan_logg
         WHERE event_id = ? AND user_id = ? AND registration_id = ? AND is_deleted = 0 AND scan_for = ?
@@ -91,7 +92,7 @@ try {
         exit;
     }
 
-    // Insert scan log
+    // ✅ Insert scan log
     $insertStmt = $eventConn->prepare("
         INSERT INTO event_scan_logg (
             event_id, user_id, registration_id, app_user_id, date, time,

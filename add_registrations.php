@@ -1,14 +1,11 @@
 <?php
 header('Content-Type: application/json');
 
-// ✅ STEP 1: Read input ONCE
-$rawInput = file_get_contents('php://input');
-$input = json_decode($rawInput, true);
+$GLOBALS['input_data'] = json_decode(file_get_contents('php://input'), true);
 
-// ✅ STEP 2: Make input globally reusable for auth_api.php
-$GLOBALS['input_data'] = $input;
+$input = $GLOBALS['input_data'];
 
-// ✅ STEP 3: Include dependencies
+// Include dependencies
 require_once 'auth_api.php';
 require_once 'config.php';
 require_once 'connect_event_database.php';
@@ -17,23 +14,23 @@ require_once 'tables.php';
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
-    if (!$input || !isset($input['user'], $input['event_id'], $input['category_id'])) {
-        throw new Exception('Invalid input data');
+    // Basic validation
+    if (!$input || !isset($input['event_id'], $input['category_id'])) {
+        throw new Exception('Invalid input data: event_id and category_id required');
     }
 
-    $user = $input['user'];
     $eventId = (int)$input['event_id'];
     $categoryId = (int)$input['category_id'];
-    $regDetails = $input['registration_details'] ?? [];
 
+    // Connect to event DB
     $connectionResult = connectEventDb($eventId);
     if (!$connectionResult['success']) {
         throw new Exception($connectionResult['message']);
     }
-
     /** @var mysqli $eventDb */
     $eventDb = $connectionResult['conn'];
 
+    // Fetch category details
     $stmt = $eventDb->prepare("SELECT * FROM " . TABLE_EVENT_CATEGORIES . " WHERE id = ? AND event_id = ? LIMIT 1");
     $stmt->bind_param("ii", $categoryId, $eventId);
     $stmt->execute();
@@ -44,6 +41,55 @@ try {
         throw new Exception('Category not found for this event');
     }
 
+
+    if (isset($input['industry_name']) && empty($input['user']) && empty($input['registration_details'])) {
+        $industryName = trim($input['industry_name']);
+        if (!$industryName) {
+            throw new Exception('Industry name is required for industry insertion');
+        }
+
+        $printingCategory = $category['printing_category'] ?? '';
+        $addedBy = null; 
+
+       
+        $stmt = $eventDb->prepare("
+            INSERT INTO event_industries (
+                event_id, name, category_id, printing_category, added_by, status, is_deleted, created_at, modified_at
+            ) VALUES (
+                ?, ?, ?, 'Industry', 1, 0, 0, NOW(), NOW()
+            )
+        ");
+        $stmt->bind_param("isi", $eventId, $industryName, $categoryId,);
+        $stmt->execute();
+        $industryId = $stmt->insert_id;
+        $stmt->close();
+
+        // Update unique_value = id (as string)
+        $uniqueValue = (string)$industryId;
+        $stmt = $eventDb->prepare("UPDATE event_industries SET unique_value = ? WHERE id = ?");
+        $stmt->bind_param("si", $uniqueValue, $industryId);
+        $stmt->execute();
+        $stmt->close();
+
+        echo json_encode(['success' => true, 'message' => 'Industry added successfully']);
+        exit; // Stop further processing
+    }
+
+    // --- CASE 2: Full registration process ---
+    if (!isset($input['user'])) {
+        throw new Exception('User data is required for registration');
+    }
+
+    $user = $input['user'];
+    $regDetails = $input['registration_details'] ?? [];
+
+    // Here, $conn is assumed to be the main database connection (not eventDb)
+    // Make sure $conn is defined by your included files (e.g., connect_event_database.php or config.php)
+    if (!isset($conn) || !$conn instanceof mysqli) {
+        throw new Exception('Main database connection not found');
+    }
+
+    // Attendee lookup in main DB
     $firstName = $user['first_name'] ?? '';
     $lastName = $user['last_name'] ?? '';
     $email = $user['primary_email_address'] ?? '';
@@ -61,6 +107,7 @@ try {
     $attendee = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
+    // Check existing registration in event DB
     $stmt = $eventDb->prepare("
         SELECT er.id, er.is_deleted, a.id AS attendee_id
         FROM " . TABLE_EVENT_REGISTRATIONS . " er
@@ -93,6 +140,7 @@ try {
         }
     }
 
+    // Insert attendee if not found
     if (!$attendee) {
         $uniqueId = uniqid('att_', true);
         $shortName = trim($firstName . ' ' . $lastName);
@@ -158,6 +206,7 @@ try {
         }
     }
 
+    // Insert event registration
     $travel = $category['is_travel'] ?? 0;
     $accommodation = $category['is_accomodation'] ?? 0;
     $taxi = $category['is_travel'] ?? 0;
