@@ -2,28 +2,24 @@
 header("Content-Type: application/json");
 date_default_timezone_set('Asia/Kolkata');
 
-require_once 'auth_api.php'; // Include authentication logic
-require_once 'config.php'; // Main DB connection
-require_once 'connect_event_database.php'; // Function to connect to the event database
+require_once 'auth_api.php'; 
+require_once 'config.php'; 
+require_once 'connect_event_database.php'; 
 
 try {
-    // Get the input data
     $input = json_decode(file_get_contents("php://input"), true);
 
-    // Extract required fields from the input
     $event_id        = $input['event_id'] ?? null;
     $app_user_id     = $input['app_user_id'] ?? null;
     $user_id         = $input['user_id'] ?? null;
     $registration_id = $input['registration_id'] ?? null;
-    $print_type      = $input['print_type'] ?? 'Issued'; // Default to 'Issued'
+    $print_type      = $input['print_type'] ?? 'Issued'; 
     $is_deleted      = $input['is_deleted'] ?? 0;
 
-    // Validate required fields
     if (!$event_id || !$app_user_id || $user_id === null || $registration_id === null) {
         throw new Exception("Missing required fields: event_id, app_user_id, user_id, or registration_id");
     }
 
-    // Check if the event exists
     $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ? LIMIT 1");
     $stmt->bind_param("i", $event_id);
     $stmt->execute();
@@ -33,10 +29,7 @@ try {
     }
     $stmt->close();
 
-    // Determine if this is a Master QR scan
     $isMasterQR = ($user_id == 0 && $registration_id == 0);
-
-    // Determine scan_for based on time
 
     $currentTime = date('H:i:s');
     list($h, $m, $s) = explode(':', $currentTime);
@@ -44,25 +37,21 @@ try {
 
     $scan_for = null;
 
-    // Lunch: 10:00 (600) to 16:00 (960)
     if ($currentMinutes >= 600 && $currentMinutes <= 1080) {
         $scan_for = 'Lunch';
     }
-    // Dinner: 18:00 (1080) to 23:59 (1439) OR 00:00 (0) to 03:00 (180)
     elseif (($currentMinutes >= 1080 && $currentMinutes <= 1439) || ($currentMinutes >= 0 && $currentMinutes <= 180)) {
         $scan_for = 'Dinner';
     } else {
         throw new Exception("Scan time outside Lunch and Dinner windows.");
     }
 
-    // Connect to the event database
     $eventResult = connectEventDb($event_id);
     if (!$eventResult['success']) {
         throw new Exception($eventResult['message']);
     }
     $eventConn = $eventResult['conn'];
 
-    // If Master QR, skip permission checks and log directly
     if ($isMasterQR) {
         $insertStmt = $eventConn->prepare("
             INSERT INTO event_scan_logs_food (
@@ -93,7 +82,6 @@ try {
     $hasLunch = 0;
     $hasDinner = 0;
 
-    // Check category and access permissions
     if ($isIndustry) {
         $stmt = $eventConn->prepare("
             SELECT ei.category_id, ec.is_lunch, ec.is_dinner
@@ -125,7 +113,6 @@ try {
     $hasDinner = intval($row['is_dinner']);
     $stmt->close();
 
-    // Permission check
     if ($scan_for === 'Lunch' && !$hasLunch) {
         echo json_encode(['success' => false, 'message' => 'No access for Lunch based on category.']);
         exit;
@@ -135,7 +122,6 @@ try {
         exit;
     }
 
-    // Check for duplicate scan unless print_type is 'Reissued'
     $dupStmt = $eventConn->prepare("
         SELECT id FROM event_scan_logs_food
         WHERE event_id = ? AND app_user_id = ? AND user_id = ? AND registration_id = ?
@@ -156,7 +142,6 @@ try {
         exit;
     }
 
-    // Log scan
     $insertStmt = $eventConn->prepare("
         INSERT INTO event_scan_logs_food (
             event_id, app_user_id, user_id, registration_id,
@@ -180,7 +165,6 @@ try {
     ]);
 
 } catch (Exception $e) {
-    // Handle exceptions and return error response
     http_response_code(500);
     echo json_encode([
         'success' => false,

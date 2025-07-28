@@ -20,19 +20,16 @@ try {
     $status          = $input['status'] ?? 1;
     $is_deleted      = $input['is_deleted'] ?? 0;
 
-    // Validate required fields
     if (!$event_id || !$registration_id || $user_id === null || !$app_user_id) {
         throw new Exception("Missing required fields: event_id, user_id, registration_id, or app_user_id");
     }
 
-    // Connect to the event database
     $eventResult = connectEventDb($event_id);
     if (!$eventResult['success']) {
         throw new Exception($eventResult['message']);
     }
     $eventConn = $eventResult['conn'];
 
-    // Step 1: Validate registration/industry ID and get category_id
     $isIndustry = ($user_id == 0);
     $category_id = null;
 
@@ -61,7 +58,6 @@ try {
     $category_id = $row['category_id'];
     $stmt->close();
 
-    // Step 2: Check if kit access is allowed based on category
     if (strtolower($scan_for) === 'kit') {
         $catStmt = $eventConn->prepare("
             SELECT name, is_kit FROM event_categories
@@ -82,7 +78,6 @@ try {
         }
     }
 
-    // Step 3: Check for duplicate scan unless it's a Reissued
     $checkStmt = $eventConn->prepare("
         SELECT id FROM event_scan_logg
         WHERE event_id = ? AND user_id = ? AND registration_id = ?
@@ -107,7 +102,6 @@ try {
         $print_type = 'Issued';
     }
 
-    // Step 4: Log the scan
     $insertStmt = $eventConn->prepare("
         INSERT INTO event_scan_logg (
             event_id, user_id, registration_id, app_user_id,

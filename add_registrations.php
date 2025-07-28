@@ -5,7 +5,6 @@ $GLOBALS['input_data'] = json_decode(file_get_contents('php://input'), true);
 
 $input = $GLOBALS['input_data'];
 
-// Include dependencies
 require_once 'auth_api.php';
 require_once 'config.php';
 require_once 'connect_event_database.php';
@@ -14,7 +13,6 @@ require_once 'tables.php';
 mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 
 try {
-    // Basic validation
     if (!$input || !isset($input['event_id'], $input['category_id'])) {
         throw new Exception('Invalid input data: event_id and category_id required');
     }
@@ -22,7 +20,6 @@ try {
     $eventId = (int)$input['event_id'];
     $categoryId = (int)$input['category_id'];
 
-    // Connect to event DB
     $connectionResult = connectEventDb($eventId);
     if (!$connectionResult['success']) {
         throw new Exception($connectionResult['message']);
@@ -30,7 +27,6 @@ try {
     /** @var mysqli $eventDb */
     $eventDb = $connectionResult['conn'];
 
-    // Fetch category details
     $stmt = $eventDb->prepare("SELECT * FROM " . TABLE_EVENT_CATEGORIES . " WHERE id = ? AND event_id = ? LIMIT 1");
     $stmt->bind_param("ii", $categoryId, $eventId);
     $stmt->execute();
@@ -64,7 +60,6 @@ try {
         $industryId = $stmt->insert_id;
         $stmt->close();
 
-        // Update unique_value = id (as string)
         $uniqueValue = (string)$industryId;
         $stmt = $eventDb->prepare("UPDATE event_industries SET unique_value = ? WHERE id = ?");
         $stmt->bind_param("si", $uniqueValue, $industryId);
@@ -72,10 +67,9 @@ try {
         $stmt->close();
 
         echo json_encode(['success' => true, 'message' => 'Industry added successfully']);
-        exit; // Stop further processing
+        exit;
     }
 
-    // --- CASE 2: Full registration process ---
     if (!isset($input['user'])) {
         throw new Exception('User data is required for registration');
     }
@@ -83,13 +77,10 @@ try {
     $user = $input['user'];
     $regDetails = $input['registration_details'] ?? [];
 
-    // Here, $conn is assumed to be the main database connection (not eventDb)
-    // Make sure $conn is defined by your included files (e.g., connect_event_database.php or config.php)
     if (!isset($conn) || !$conn instanceof mysqli) {
         throw new Exception('Main database connection not found');
     }
 
-    // Attendee lookup in main DB
     $firstName = $user['first_name'] ?? '';
     $lastName = $user['last_name'] ?? '';
     $email = $user['primary_email_address'] ?? '';
@@ -107,7 +98,6 @@ try {
     $attendee = $stmt->get_result()->fetch_assoc();
     $stmt->close();
 
-    // Check existing registration in event DB
     $stmt = $eventDb->prepare("
         SELECT er.id, er.is_deleted, a.id AS attendee_id
         FROM " . TABLE_EVENT_REGISTRATIONS . " er
@@ -140,7 +130,6 @@ try {
         }
     }
 
-    // Insert attendee if not found
     if (!$attendee) {
         $uniqueId = uniqid('att_', true);
         $shortName = trim($firstName . ' ' . $lastName);
@@ -206,7 +195,6 @@ try {
         }
     }
 
-    // Insert event registration
     $travel = $category['is_travel'] ?? 0;
     $accommodation = $category['is_accomodation'] ?? 0;
     $taxi = $category['is_travel'] ?? 0;

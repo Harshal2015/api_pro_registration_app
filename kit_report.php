@@ -8,7 +8,6 @@ require_once 'connect_event_database.php';
 require_once 'tables.php';
 
 try {
-    // Get event_id from GET or POST JSON body
     $inputEventId = null;
 
     if (isset($_GET['event_id'])) {
@@ -26,7 +25,6 @@ try {
     }
     $event_id = (int)$inputEventId;
 
-    // Fetch short_name for event
     $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
     $stmt->bind_param("i", $event_id);
     $stmt->execute();
@@ -35,12 +33,10 @@ try {
     $short = strtolower($result->fetch_assoc()['short_name']);
     $stmt->close();
 
-    // Connect event database
     $eventResult = connectEventDb($event_id);
     if (!$eventResult['success']) throw new Exception($eventResult['message']);
     $eventConn = $eventResult['conn'];
 
-    // Fetch scan logs
     $scanMap = [];
     $scanStmt = $eventConn->prepare("
         SELECT user_id, registration_id, print_type, date, time
@@ -70,7 +66,6 @@ try {
     }
     $scanStmt->close();
 
-    // Get attendees
     $attendeeRegs = [];
     $userIds = [];
     $regStmt = $eventConn->prepare("
@@ -88,7 +83,6 @@ try {
     }
     $regStmt->close();
 
-    // Get industry entries
     $industryRegs = [];
     $indStmt = $eventConn->prepare("
         SELECT id AS registration_id, name AS category_name
@@ -107,7 +101,6 @@ try {
     }
     $indStmt->close();
 
-    // Get attendee names
     $attendees = [];
     if (!empty($userIds)) {
         $placeholders = implode(',', array_fill(0, count($userIds), '?'));

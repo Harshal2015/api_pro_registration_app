@@ -1,5 +1,5 @@
 <?php
-require_once 'config.php'; // Make sure this defines $servername, $username, $password, $conn (mysqli)
+require_once 'config.php'; 
 
 function connectEventDb($event_id) {
     global $conn, $servername, $username, $password;

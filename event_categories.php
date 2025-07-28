@@ -13,7 +13,6 @@ try {
         throw new Exception('Missing event_id');
     }
 
-    // Step 1: Get short_name from main DB
     $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
     $stmt->bind_param("i", $eventId);
     $stmt->execute();
@@ -25,7 +24,6 @@ try {
         throw new Exception('Invalid event_id or short_name not found');
     }
 
-    // Step 2: Connect to event-specific database
     $eventResult = connectEventDb($eventId);
     if (!$eventResult['success']) {
         throw new Exception($eventResult['message']);
@@ -33,7 +31,6 @@ try {
 
     $eventConn = $eventResult['conn'];
 
-    // Step 3: Fetch all categories (excluding deleted)
     $categorySql = "SELECT id, name FROM event_categories 
                     WHERE parent_id IS NOT NULL AND is_deleted = 0";
     $categoryResult = $eventConn->query($categorySql);
@@ -48,7 +45,6 @@ try {
         }
     }
 
-    // Step 4: Return response (only categories)
     echo json_encode([
         'success' => true,
         'categories' => $categories

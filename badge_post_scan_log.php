@@ -10,8 +10,8 @@ try {
     $input = json_decode(file_get_contents("php://input"), true);
 
     $event_id        = $input['event_id'] ?? null;
-    $user_id         = $input['user_id'] ?? null; // can be uniqueValue (industry) or user_id
-    $registration_id = $input['registration_id'] ?? null; // can be industry.id or registration.id
+    $user_id         = $input['user_id'] ?? null; 
+    $registration_id = $input['registration_id'] ?? null; 
     $app_user_id     = $input['app_user_id'] ?? null;
     $api_key         = $input['api_key'] ?? null;
 
@@ -26,7 +26,6 @@ try {
         throw new Exception("Missing required fields: event_id or registration_id");
     }
 
-    // Connect to event-specific database
     $connectionResult = connectEventDb($event_id);
     if (!$connectionResult['success']) {
         throw new Exception($connectionResult['message']);
@@ -35,7 +34,6 @@ try {
     /** @var mysqli $eventConn */
     $eventConn = $connectionResult['conn'];
 
-    // 🔍 Detect whether it's an industry by checking event_industries
     $industryCheckStmt = $eventConn->prepare("
         SELECT id, unique_value FROM event_industries 
         WHERE event_id = ? AND id = ? AND is_deleted = 0 
@@ -50,11 +48,7 @@ try {
     $isIndustry = $industry ? true : false;
 
     if ($isIndustry) {
-        // Industry ID already verified above
-        // Optional: You could override $user_id here using $industry['unique_value']
-        // Example: $user_id = $industry['unique_value'];
     } else {
-        // Not an industry, must be a regular user registration
         $registrationCheckStmt = $eventConn->prepare("
             SELECT user_id FROM event_registrations
             WHERE event_id = ? AND id = ? AND user_id = ? AND is_deleted = 0
@@ -71,7 +65,6 @@ try {
         }
     }
 
-    // 🔁 Check for duplicate scan unless Reissued
     $checkStmt = $eventConn->prepare("
         SELECT id FROM event_scan_logg
         WHERE event_id = ? AND user_id = ? AND registration_id = ? AND is_deleted = 0 AND scan_for = ?
@@ -92,7 +85,6 @@ try {
         exit;
     }
 
-    // ✅ Insert scan log
     $insertStmt = $eventConn->prepare("
         INSERT INTO event_scan_logg (
             event_id, user_id, registration_id, app_user_id, date, time,

@@ -1,8 +1,6 @@
 <?php
 header('Content-Type: application/json');
 date_default_timezone_set('Asia/Kolkata');
-
-// Enable error reporting for debugging (disable in production)
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -13,10 +11,8 @@ require_once 'auth_api.php';
 
 
 try {
-    // Get JSON input and decode to array
     $input = json_decode(file_get_contents("php://input"), true);
 
-    // Validate and sanitize inputs
     $app_user_id          = isset($input['app_user_id']) ? intval($input['app_user_id']) : 0;
     $event_id             = isset($input['event_id']) ? intval($input['event_id']) : 0;
     $attendee_id          = isset($input['attendee_id']) ? intval($input['attendee_id']) : 0;
@@ -29,7 +25,6 @@ try {
         throw new Exception("Missing required fields: app_user_id, event_id, and action_type are mandatory");
     }
 
-    // Connect to the event-specific database
     $eventResult = connectEventDb($event_id);
     if (!$eventResult['success']) {
         throw new Exception($eventResult['message']);
@@ -38,7 +33,6 @@ try {
 
     $now = date('Y-m-d H:i:s');
 
-    // Check if a record already exists for this app_user_id, event_id, and attendee_id
     $checkQuery = $eventConn->prepare("
         SELECT id, is_preview 
         FROM " . TABLE_BADGE_PRINT_ANIMATION . " 
@@ -53,7 +47,6 @@ try {
     $result = $checkQuery->get_result();
 
     if ($result->num_rows === 0) {
-        // No matching record: insert new
         $insertQuery = $eventConn->prepare("
             INSERT INTO " . TABLE_BADGE_PRINT_ANIMATION . " 
             (app_user_id, event_id, attendee_id, attendee_name, attendee_category, attendee_subcategory, is_preview, is_printed, is_delete, created_at, updated_at)
@@ -88,7 +81,6 @@ try {
         $insertQuery->close();
 
     } else {
-        // Matching record exists: update
         $row = $result->fetch_assoc();
 
         $is_preview = $action_type;

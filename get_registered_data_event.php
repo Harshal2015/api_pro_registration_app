@@ -5,7 +5,6 @@ require_once 'config.php';
 require_once 'connect_event_database.php';
 require_once 'tables.php';
 
-// Read input
 $input = json_decode(file_get_contents("php://input"), true);
 $event_id = isset($input['event_id']) ? intval($input['event_id']) : 0;
 $page = isset($input['page']) ? max(1, intval($input['page'])) : 1;
@@ -16,7 +15,6 @@ if (!$event_id) {
     exit();
 }
 
-// Connect to event DB
 $connectionResult = connectEventDb($event_id);
 if (!$connectionResult['success']) {
     echo json_encode($connectionResult);
@@ -26,10 +24,8 @@ if (!$connectionResult['success']) {
 $eventConn = $connectionResult['conn'];
 $eventDb = $connectionResult['db_name'];
 
-// Pagination setup
 $offset = ($page - 1) * $page_size;
 
-// Get count of registrations
 $countQuery = "SELECT COUNT(*) as total_count FROM {$eventDb}.event_registrations WHERE is_deleted = 0 AND event_id = ?";
 $countStmt = $eventConn->prepare($countQuery);
 $countStmt->bind_param("i", $event_id);
@@ -38,7 +34,6 @@ $countResult = $countStmt->get_result();
 $registeredCount = $countResult->fetch_assoc()['total_count'] ?? 0;
 $countStmt->close();
 
-// Get count of event industries
 $industryCountQuery = "SELECT COUNT(*) as total_count FROM {$eventDb}.event_industries WHERE is_deleted = 0 AND event_id = ?";
 $industryCountStmt = $eventConn->prepare($industryCountQuery);
 $industryCountStmt->bind_param("i", $event_id);
@@ -47,7 +42,6 @@ $industryCountResult = $industryCountStmt->get_result();
 $industriesCount = $industryCountResult->fetch_assoc()['total_count'] ?? 0;
 $industryCountStmt->close();
 
-// If no registrations and industries, return empty
 if ($registeredCount === 0 && $industriesCount === 0) {
     echo json_encode([
         'success' => true,
@@ -63,10 +57,8 @@ if ($registeredCount === 0 && $industriesCount === 0) {
     exit();
 }
 
-// Prepare LIMIT clause (inject directly since bind_param does not support LIMIT/OFFSET)
 $limitOffsetClause = $page_size > 0 ? "LIMIT $page_size OFFSET $offset" : "";
 
-// Fetch registrations with pagination
 $query = "
     SELECT 
         er.*, 
@@ -94,7 +86,6 @@ while ($row = $result->fetch_assoc()) {
 }
 $stmt->close();
 
-// Fetch event industries (no pagination)
 $industriesQuery = "
     SELECT 
         ei.id, ei.event_id, ei.name, ei.category_id, ec.name AS category_name,
@@ -116,10 +107,8 @@ while ($row = $industriesResult->fetch_assoc()) {
 }
 $industriesStmt->close();
 
-// Close DB connection
 $eventConn->close();
 
-// Return JSON response
 echo json_encode([
     'success' => true,
     'total_count' => $registeredCount + $industriesCount,

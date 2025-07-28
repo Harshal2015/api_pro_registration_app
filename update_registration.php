@@ -11,15 +11,12 @@ try {
     $input = json_decode(file_get_contents("php://input"), true);
 
     $event_id    = $input['event_id'] ?? null;
-    $user_id     = $input['user_id'] ?? null;  // user_id for attendee update
+    $user_id     = $input['user_id'] ?? null;  
     $category_id = $input['category_id'] ?? null;
 
-    // Industry input
     $industry_name = trim($input['name'] ?? '');
-    // Accept industry ID from either "industry_id" or "id"
     $industry_id_input = $input['id'] ?? ($input['id'] ?? null);
 
-    // Attendee input
     $prefix            = $input['prefix'] ?? null;
     $first_name        = trim($input['first_name'] ?? '');
     $last_name         = trim($input['last_name'] ?? '');
@@ -37,7 +34,6 @@ try {
         throw new Exception("Missing required fields: event_id or category_id");
     }
 
-    // Connect to event-specific DB
     $eventResult = connectEventDb($event_id);
     if (!$eventResult['success']) {
         throw new Exception($eventResult['message']);
@@ -45,7 +41,6 @@ try {
     $eventConn = $eventResult['conn'];
     $mainConn = $conn;
 
-    // Check if the category is industry by checking if an industry record exists for event+category
     $catTypeStmt = $eventConn->prepare("
         SELECT id FROM event_industries 
         WHERE event_id = ? AND category_id = ? 
@@ -65,7 +60,6 @@ try {
         if ($industry_id_input) {
             $id = intval($industry_id_input);
 
-            // Verify industry_id exists and belongs to this event and category
             $verifyStmt = $eventConn->prepare("
                 SELECT id FROM event_industries 
                 WHERE id = ? AND event_id = ? AND category_id = ? LIMIT 1
@@ -80,7 +74,6 @@ try {
                 throw new Exception("Invalid id for this event and category.");
             }
         } else {
-            // Get industry ID from event_industries by event + category
             $getIndustry = $eventConn->prepare("
                 SELECT id FROM event_industries 
                 WHERE event_id = ? AND category_id = ? 
@@ -97,11 +90,8 @@ try {
             }
             $id = $industry['id'];
         }
-
-        // DEBUG: log industry ID we will update
         error_log("Updating industry ID: " . $id);
 
-        // Update industry name
         $updInd = $eventConn->prepare("
             UPDATE event_industries 
             SET name = ?, modified_at = NOW()
@@ -119,12 +109,10 @@ try {
         exit;
     }
 
-    // If not industry, proceed to attendee update
     if (!$user_id) {
         throw new Exception("Missing user_id for attendee update.");
     }
 
-    // Update event_registrations category if changed
     $checkReg = $eventConn->prepare("
         SELECT category_id FROM event_registrations WHERE event_id = ? AND user_id = ?
     ");
@@ -145,7 +133,6 @@ try {
         $updReg->close();
     }
 
-    // Check attendee in main DB
     $chkAtt = $mainConn->prepare("SELECT * FROM " . TABLE_ATTENDEES . " WHERE id = ?");
     $chkAtt->bind_param("i", $user_id);
     $chkAtt->execute();

@@ -8,11 +8,9 @@ require_once 'connect_event_database.php';
 require_once 'tables.php';
 
 try {
-    // Read and decode raw input
     $rawInput = file_get_contents("php://input");
     $input = json_decode($rawInput, true);
 
-    // Log input for debugging (optional: remove in production)
     file_put_contents('badge_log_debug.txt', print_r([
         'timestamp' => date('Y-m-d H:i:s'),
         'raw_input' => $rawInput,
@@ -20,14 +18,12 @@ try {
         'GET' => $_GET,
     ], true), FILE_APPEND);
 
-    // Get event_id safely
     $event_id = $_GET['event_id'] ?? ($input['event_id'] ?? null);
     if (!$event_id || !is_numeric($event_id)) {
         throw new Exception("Missing or invalid event_id");
     }
     $event_id = (int)$event_id;
 
-    // Get event short name
     $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
     $stmt->bind_param("i", $event_id);
     $stmt->execute();
@@ -36,12 +32,10 @@ try {
     $short = strtolower($result->fetch_assoc()['short_name']);
     $stmt->close();
 
-    // Connect to event DB
     $eventResult = connectEventDb($event_id);
     if (!$eventResult['success']) throw new Exception($eventResult['message']);
     $eventConn = $eventResult['conn'];
 
-    // Fetch scan logs
     $scanMap = [];
     $scanStmt = $eventConn->prepare("
         SELECT user_id, registration_id, print_type, date, time
@@ -71,7 +65,6 @@ try {
     }
     $scanStmt->close();
 
-    // Fetch attendees
     $attendeeRegs = [];
     $userIds = [];
     $regStmt = $eventConn->prepare("
@@ -89,7 +82,6 @@ try {
     }
     $regStmt->close();
 
-    // Fetch industry regs
     $industryRegs = [];
     $indStmt = $eventConn->prepare("
         SELECT id AS registration_id, name AS category_name
@@ -108,7 +100,6 @@ try {
     }
     $indStmt->close();
 
-    // Fetch attendee names
     $attendees = [];
     if (!empty($userIds)) {
         $placeholders = implode(',', array_fill(0, count($userIds), '?'));
@@ -127,7 +118,6 @@ try {
         $attStmt->close();
     }
 
-    // Initialize reports
     $attendeeReport = [];
     $industryReport = [];
     $stats = [
@@ -135,7 +125,6 @@ try {
         'industries' => ['total' => 0, 'collected' => 0, 'reissued' => 0, 'not_collected' => 0]
     ];
 
-    // Build entry function
     function buildEntries($reg, $attendees, $scanMap, &$reportArray, &$statArray) {
         $key = "{$reg['user_id']}:{$reg['registration_id']}";
         $statArray['total']++;
@@ -152,7 +141,6 @@ try {
             $entries[] = ['status' => 'Not Collected', 'date_time' => null];
         }
 
-        // Name logic
         $name = 'Industry Participant';
         if ($reg['user_id'] != 0 && isset($attendees[$reg['user_id']])) {
             $a = $attendees[$reg['user_id']];
@@ -177,7 +165,6 @@ try {
         }
     }
 
-    // Build reports
     foreach ($attendeeRegs as $reg) {
         buildEntries($reg, $attendees, $scanMap, $attendeeReport, $stats['attendees']);
     }
@@ -185,7 +172,6 @@ try {
         buildEntries($reg, [], $scanMap, $industryReport, $stats['industries']);
     }
 
-    // Final totals
     $combined = [
         'total' => $stats['attendees']['total'] + $stats['industries']['total'],
         'collected' => $stats['attendees']['collected'] + $stats['industries']['collected'],
@@ -193,7 +179,6 @@ try {
         'not_collected' => $stats['attendees']['not_collected'] + $stats['industries']['not_collected']
     ];
 
-    // Return JSON response
     echo json_encode([
         'event_id' => $event_id,
         'short_name' => $short,

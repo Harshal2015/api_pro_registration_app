@@ -7,12 +7,10 @@ require_once 'connect_event_database.php';
 require_once 'tables.php';
 
 try {
-    // Get event_id
     $input = $_GET['event_id'] ?? json_decode(file_get_contents('php://input'), true)['event_id'] ?? null;
     if (!$input || !is_numeric($input)) throw new Exception('Missing or invalid event_id');
     $event_id = (int)$input;
 
-    // Fetch event info
     $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ?");
     $stmt->bind_param("i", $event_id);
     $stmt->execute();
@@ -21,16 +19,13 @@ try {
     $short = strtolower($res->fetch_assoc()['short_name']);
     $stmt->close();
 
-    // Connect to event DB
     $ev = connectEventDb($event_id);
     if (!$ev['success']) throw new Exception($ev['message']);
     $eventConn = $ev['conn'];
 
-    // Data holders
     $scanMap = [];
     $masterQrDaily = [];
 
-    // Fetch scan logs
     $scanStmt = $eventConn->prepare("
         SELECT user_id, registration_id, print_type, scan_for, date, time
         FROM event_scan_logs_food
@@ -70,7 +65,6 @@ try {
     }
     $scanStmt->close();
 
-    // Fetch registrations (attendees)
     $attRegs = [];
     $userIds = [];
     $regStmt = $eventConn->prepare("
@@ -88,7 +82,6 @@ try {
     }
     $regStmt->close();
 
-    // Fetch industries registrations
     $indRegs = [];
     $indStmt = $eventConn->prepare("
         SELECT id AS reg_id, name AS category_name
@@ -99,15 +92,12 @@ try {
     $indStmt->execute();
     $ii = $indStmt->get_result();
     while ($i = $ii->fetch_assoc()) {
-        // Industries do not have user_id, set 0
         $indRegs[] = ['user_id' => 0, 'reg_id' => $i['reg_id'], 'category' => $i['category_name']];
     }
     $indStmt->close();
 
-    // Fetch attendee names
     $attendees = [];
     if (!empty($userIds)) {
-        // Prepare placeholders for IN query
         $ph = implode(',', array_fill(0, count($userIds), '?'));
         $types = str_repeat('i', count($userIds));
         $attStmt = $conn->prepare("SELECT id, prefix, short_name, first_name, last_name FROM " . TABLE_ATTENDEES . " WHERE id IN ($ph)");
@@ -122,11 +112,9 @@ try {
         $attStmt->close();
     }
 
-    // Separate meal wise stats for attendees and industries
     $mealWiseStatsAttendees = ['lunch' => [], 'dinner' => []];
     $mealWiseStatsIndustries = ['lunch' => [], 'dinner' => []];
 
-    // Function to update meal wise stats
     function updateMealWiseStats(&$stats, $meal, $date, $status) {
         if (!isset($stats[$meal][$date])) {
             $stats[$meal][$date] = ['taken' => 0, 'retaken' => 0, 'not_taken' => 0, 'master_qr' => 0, 'total' => 0];
@@ -140,7 +128,6 @@ try {
         }
     }
 
-    // Function to build report entries for either attendees or industries
     function buildEntries($reg, $attendees, $scanMap, &$report, &$mealWiseStats, $isIndustry) {
         foreach (['lunch', 'dinner'] as $meal) {
             $key = "{$reg['user_id']}:{$reg['reg_id']}:$meal";
@@ -155,7 +142,6 @@ try {
 
             if (empty($entries)) {
                 $entries[] = ['status' => 'Not Taken', 'meal' => ucfirst($meal), 'date_time' => null];
-                // Use today's date for 'not taken' when no scan
                 $date = date('Y-m-d');
                 updateMealWiseStats($mealWiseStats, $meal, $date, 'Not Taken');
             } else {
@@ -187,7 +173,6 @@ try {
         }
     }
 
-    // Build reports
     $attReport = [];
     $indReport = [];
 
@@ -198,12 +183,10 @@ try {
         buildEntries($r, $attendees, $scanMap, $indReport, $mealWiseStatsIndustries, true);
     }
 
-    // Now update the master_qr and total counts in meal wise stats for both attendee and industry stats
     foreach (['lunch', 'dinner'] as $meal) {
         foreach ($masterQrDaily as $date => $counts) {
             $mqrCount = $counts[$meal] ?? 0;
 
-            // Attendee stats
             if (!isset($mealWiseStatsAttendees[$meal][$date])) {
                 $mealWiseStatsAttendees[$meal][$date] = ['taken' => 0, 'retaken' => 0, 'not_taken' => 0, 'master_qr' => 0, 'total' => 0];
             }
@@ -213,7 +196,6 @@ try {
                 $mealWiseStatsAttendees[$meal][$date]['retaken'] + 
                 $mealWiseStatsAttendees[$meal][$date]['master_qr'];
 
-            // Industry stats
             if (!isset($mealWiseStatsIndustries[$meal][$date])) {
                 $mealWiseStatsIndustries[$meal][$date] = ['taken' => 0, 'retaken' => 0, 'not_taken' => 0, 'master_qr' => 0, 'total' => 0];
             }
@@ -225,7 +207,6 @@ try {
         }
     }
 
-    // Output the JSON without stats and combined totals, with split meal-wise stats including totals
     echo json_encode([
         'event_id' => $event_id,
         'short_name' => $short,

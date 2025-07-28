@@ -1,12 +1,9 @@
 <?php
-// Start auth_api.php
 
 header("Content-Type: application/json");
 
-// Get raw POST body and decode JSON
 $input = json_decode(file_get_contents("php://input"), true);
 
-// Validate input
 $app_user_id = $input['app_user_id'] ?? null;
 $api_key = $input['api_key'] ?? null;
 
@@ -16,8 +13,7 @@ if (!$app_user_id    || !$api_key) {
     exit;
 }
 
-// Database connection
-$conn = new mysqli("localhost", "root", "", "prop_propass");  // Teri Config File yha include kr lena
+$conn = new mysqli("localhost", "root", "", "prop_propass");  
 
 if ($conn->connect_error) {
     http_response_code(500);
@@ -25,7 +21,6 @@ if ($conn->connect_error) {
     exit;
 }
 
-// Check user and api_key
 $stmt = $conn->prepare("SELECT * FROM reg_app_users WHERE id = ? AND api_key = ?");
 $stmt->bind_param("ss", $app_user_id, $api_key);
 $stmt->execute();

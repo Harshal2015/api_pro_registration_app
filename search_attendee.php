@@ -2,7 +2,7 @@
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 
-require_once 'config.php';          // $conn = main DB connection
+require_once 'config.php';     
 require_once 'connect_event_database.php'; 
 require_once 'tables.php';
 require_once 'auth_api.php';
@@ -25,7 +25,6 @@ if (!$name && !$email && !$phone) {
     exit;
 }
 
-// Map event ID to event short name from main DB
 $eventShortName = '';
 $stmt = $conn->prepare("SELECT short_name FROM events WHERE id = ? LIMIT 1");
 $stmt->bind_param('i', $eventId);
@@ -41,7 +40,6 @@ if (!$eventShortName) {
     exit;
 }
 
-// Escape LIKE wildcards for safe LIKE queries
 function esc($str) {
     return str_replace(['%', '_'], ['\%', '\_'], $str);
 }
@@ -94,12 +92,10 @@ $stmt->execute();
 $attendees = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// Initialize registrations for attendees
 foreach ($attendees as &$att) {
     $att['registrations'] = [];
 }
 
-// --- Step 2: Connect to EVENT-SPECIFIC database using short name ---
 $res = connectEventDbByShortName($eventShortName);
 if (!$res['success']) {
     echo json_encode(['success' => false, 'message' => 'Could not connect to event database']);
@@ -107,7 +103,6 @@ if (!$res['success']) {
 }
 $edb = $res['conn'];
 
-// --- Step 3: Fetch registrations for attendee IDs from event DB ---
 $ids = array_column($attendees, 'id');
 if (count($ids) > 0) {
     $inClause = implode(',', array_map('intval', $ids));
@@ -134,7 +129,6 @@ if (count($ids) > 0) {
     }
 }
 
-// --- Step 4: Fetch industries matching search term in event DB ---
 $industrySearchTerm = $name ?: $email ?: $phone;
 $industries = [];
 
@@ -170,19 +164,16 @@ if ($industrySearchTerm) {
 
 $edb->close();
 
-// --- Step 5: Filter attendees by registration if requested ---
 if ($onlyEventRegistrations) {
     $attendees = array_filter($attendees, fn($a) => count($a['registrations']) > 0);
 }
 
-// --- Step 6: Add type to attendees and clean data ---
 foreach ($attendees as &$att) {
     $att['type'] = 'attendee';
     $att['registered_events'] = $att['registrations'];
     unset($att['registrations']);
 }
 
-// --- Step 7: Merge attendees + industries and output JSON ---
 $finalResults = array_merge($attendees, $industries);
 
 echo json_encode([
