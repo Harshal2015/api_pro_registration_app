@@ -1,0 +1,896 @@
+Array
+(
+    [timestamp] => 2025-07-28 13:43:21
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:43:23
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:43:51
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:45:32
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:51:20
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:51:23
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:51:56
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:52:30
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:53:14
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:55:14
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:56:32
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:56:59
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:57:34
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:57:39
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:57:43
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:57:51
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:57:58
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:58:34
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:59:02
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 13:59:19
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 14:00:04
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 14:42:01
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 14:42:56
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 14:43:36
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 14:43:37
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 14:43:43
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 14:43:47
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 14:43:51
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 14:48:10
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 14:50:24
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 14:50:29
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 14:50:30
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:38:15
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:38:19
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:38:24
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:39:17
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:39:22
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:39:25
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:40:17
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:40:39
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:42:20
+    [raw_input] => {"event_id":"1","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 1
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:43:19
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:43:26
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:43:58
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:44:55
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:45:24
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:45:50
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:45:54
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:46:29
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:47:12
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:47:44
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:48:07
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:48:11
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:48:45
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:48:53
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
+Array
+(
+    [timestamp] => 2025-07-28 15:49:00
+    [raw_input] => {"event_id":"2","api_key":"bcjbdskj","app_user_id":"10"}
+    [parsed_input] => Array
+        (
+            [event_id] => 2
+            [api_key] => bcjbdskj
+            [app_user_id] => 10
+        )
+
+    [GET] => Array
+        (
+        )
+
+)
