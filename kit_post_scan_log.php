@@ -70,12 +70,14 @@ try {
         $catStmt->close();
 
         if (!$catInfo || intval($catInfo['is_kit']) !== 1) {
-            echo json_encode([
-                'success' => false,
-                'message' => 'No access for Kit based on category.',
-            ]);
-            exit;
-        }
+    $categoryName = $catInfo['name'] ?? 'this category';
+    echo json_encode([
+        'success' => false,
+        'message' => "No access to the Kit for $categoryName."
+    ]);
+    exit;
+}
+
     }
 
     $checkStmt = $eventConn->prepare("
@@ -90,13 +92,15 @@ try {
     $checkStmt->close();
 
     if ($alreadyScanned && strtolower($print_type) !== 'reissued') {
-        echo json_encode([
-            'success' => false,
-            'require_permission' => true,
-            'message' => "Already scanned $scan_for. Allow manual override?",
-        ]);
-        exit;
-    }
+    $scanForFormatted = ucfirst(strtolower($scan_for)); // Capitalize 'kit' or other scan types
+    echo json_encode([
+        'success' => false,
+        'require_permission' => true,
+        'message' => "$scanForFormatted already issued. Do you want to Reissue Again?",
+    ]);
+    exit;
+}
+
 
     if (!$print_type) {
         $print_type = 'Issued';
@@ -119,7 +123,7 @@ try {
 
     echo json_encode([
         'success'    => true,
-        'message'    => ucfirst($scan_for) . " scan logged successfully as $print_type.",
+        'message'    => ucfirst($scan_for) . " $print_type Succesfully ",
         'print_type' => $print_type,
         'scan_for'   => $scan_for,
     ]);

@@ -83,22 +83,24 @@ try {
     $hasDinner = 0;
 
     if ($isIndustry) {
-        $stmt = $eventConn->prepare("
-            SELECT ei.category_id, ec.is_lunch, ec.is_dinner
-            FROM event_industries ei
-            JOIN event_categories ec ON ei.category_id = ec.id
-            WHERE ei.id = ? AND ei.event_id = ? AND ei.is_deleted = 0
-            LIMIT 1
-        ");
+       $stmt = $eventConn->prepare("
+    SELECT ei.category_id, ec.is_lunch, ec.is_dinner, ec.name AS category_name
+    FROM event_industries ei
+    JOIN event_categories ec ON ei.category_id = ec.id
+    WHERE ei.id = ? AND ei.event_id = ? AND ei.is_deleted = 0
+    LIMIT 1
+");
+
         $stmt->bind_param("ii", $registration_id, $event_id);
     } else {
         $stmt = $eventConn->prepare("
-            SELECT r.category_id, ec.is_lunch, ec.is_dinner
-            FROM event_registrations r
-            JOIN event_categories ec ON r.category_id = ec.id
-            WHERE r.id = ? AND r.event_id = ? AND r.user_id = ? AND r.is_deleted = 0
-            LIMIT 1
-        ");
+    SELECT r.category_id, ec.is_lunch, ec.is_dinner, ec.name AS category_name
+    FROM event_registrations r
+    JOIN event_categories ec ON r.category_id = ec.id
+    WHERE r.id = ? AND r.event_id = ? AND r.user_id = ? AND r.is_deleted = 0
+    LIMIT 1
+");
+
         $stmt->bind_param("iii", $registration_id, $event_id, $user_id);
     }
 
@@ -109,18 +111,27 @@ try {
     }
 
     $row = $res->fetch_assoc();
-    $hasLunch = intval($row['is_lunch']);
-    $hasDinner = intval($row['is_dinner']);
+$hasLunch = intval($row['is_lunch']);
+$hasDinner = intval($row['is_dinner']);
+$categoryName = $row['category_name'] ?? 'Unknown';
+
     $stmt->close();
 
     if ($scan_for === 'Lunch' && !$hasLunch) {
-        echo json_encode(['success' => false, 'message' => 'No access for Lunch based on category.']);
-        exit;
-    }
-    if ($scan_for === 'Dinner' && !$hasDinner) {
-        echo json_encode(['success' => false, 'message' => 'No access for Dinner based on category.']);
-        exit;
-    }
+    echo json_encode([
+        'success' => false,
+        'message' => "No access for Lunch for $categoryName."
+    ]);
+    exit;
+}
+if ($scan_for === 'Dinner' && !$hasDinner) {
+    echo json_encode([
+        'success' => false,
+        'message' => "No access for Dinner for $categoryName."
+    ]);
+    exit;
+}
+
 
     $dupStmt = $eventConn->prepare("
         SELECT id FROM event_scan_logs_food
@@ -137,7 +148,7 @@ try {
         echo json_encode([
             'success' => false,
             'require_permission' => true,
-            'message' => "Already scanned for $scan_for today. Allow manual override?"
+            'message' => "$scan_for already taken. Do you want to Reissue?"
         ]);
         exit;
     }
@@ -159,7 +170,7 @@ try {
 
     echo json_encode([
         'success'     => true,
-        'message'     => "Scan logged successfully as $print_type for $scan_for.",
+        'message'     => "$scan_for  $print_type Succesfully ",
         'print_type'  => $print_type,
         'scan_for'    => $scan_for
     ]);

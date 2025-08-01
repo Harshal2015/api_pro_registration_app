@@ -13,7 +13,7 @@ if (!$app_user_id    || !$api_key) {
     exit;
 }
 
-$conn = new mysqli("localhost", "root", "", "prop_propass");  
+$conn = new mysqli("localhost", "proregistration", "X6c!eM8BQaUD[NwZ", "prop_propass");  
 
 if ($conn->connect_error) {
     http_response_code(500);

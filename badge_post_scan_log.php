@@ -77,10 +77,11 @@ try {
     $checkStmt->close();
 
     if ($alreadyScanned && $print_type !== 'Reissued') {
+         $scanForFormatted = ucfirst(strtolower($scan_for));
         echo json_encode([
             'success' => false,
             'require_permission' => true,
-            'message' => "Already scanned $scan_for before. Allow manual override?",
+            'message' => "$scanForFormatted already issued. Do you want to Reissue Again?",
         ]);
         exit;
     }
@@ -112,7 +113,7 @@ try {
 
     echo json_encode([
         'success' => true,
-        'message' => ucfirst($scan_for) . " scan logged successfully as $print_type.",
+        'message' => ucfirst($scan_for) . " $print_type Successfully",
         'print_type' => $print_type,
         'scan_for' => $scan_for,
     ]);

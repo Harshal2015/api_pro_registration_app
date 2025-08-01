@@ -184,6 +184,17 @@ try {
         );
         $stmt->execute();
         $userId = $stmt->insert_id;
+      // Unique ID Code Start
+        $firstInitial = strtoupper(substr($firstName), 0, 1);
+        $yearShort = date('y'); // e.g., 25
+ 		$paddedId = str_pad($userId, 5, '0', STR_PAD_LEFT);
+ 		$unique_id = $firstInitial . $yearShort . $paddedId;
+      
+ 		$updateSql = "UPDATE " . TABLE_ATTENDEES . " SET unique_id = '$unique_id' WHERE id = $userId";
+      
+ 		$connect->query($updateSql);
+      // Unique ID Code End
+      
         $stmt->close();
     } else {
         $userId = $attendee['id'];
